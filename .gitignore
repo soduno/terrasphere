@@ -1,11 +1,39 @@
+# Local environment and credentials
 /.env
-/.phpunit.cache
+/.env.*
+!/.env.example
+/auth.json
+
+# PHP and Composer
 /vendor/
+/.phpunit.cache/
+/.phpunit.result.cache
+/coverage/
+
+# React, Inertia, and Vite build output
+/node_modules/
+/public/build/
+/public/hot
+/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE and operating-system metadata
+/.idea/
+/.vscode/
+/.fleet/
+.DS_Store
+Thumbs.db
+
+# TerraSphere and Laravel runtime files
 /packages/core/bootstrap/cache/*.php
 /storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
 /storage/logs/*
+/storage/*.key
 
 !/packages/core/bootstrap/cache/.gitignore
 !/storage/framework/cache/.gitignore
