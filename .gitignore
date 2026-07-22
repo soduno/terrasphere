@@ -12,6 +12,8 @@
 
 # React, Inertia, and Vite build output
 /node_modules/
+/build/
+/hot
 /public/build/
 /public/hot
 /.vite/
