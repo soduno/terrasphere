@@ -1,0 +1,55 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        environment:
+            COMPOSER_ALLOW_SUPERUSER: "1"
+        volumes:
+            - .:/var/www/html
+            - composer_vendor:/var/www/html/vendor
+        depends_on:
+            mysql:
+                condition: service_healthy
+        restart: unless-stopped
+
+    caddy:
+        image: caddy:2-alpine
+        ports:
+            - "${APP_PORT:-8080}:80"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - .:/var/www/html:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        depends_on:
+            - app
+        restart: unless-stopped
+
+    mysql:
+        image: mysql:8.4
+        ports:
+            - "${DB_FORWARD_PORT:-3306}:3306"
+        environment:
+            MYSQL_DATABASE: "${DB_DATABASE:-terrasphere}"
+            MYSQL_USER: "${DB_USERNAME:-terrasphere}"
+            MYSQL_PASSWORD: "${DB_PASSWORD:-terrasphere}"
+            MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root}"
+        command:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+        volumes:
+            - mysql_data:/var/lib/mysql
+        healthcheck:
+            test: ["CMD-SHELL", "mysqladmin ping -h localhost -p\"$${MYSQL_ROOT_PASSWORD}\""]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+            start_period: 20s
+        restart: unless-stopped
+
+volumes:
+    caddy_config:
+    caddy_data:
+    composer_vendor:
+    mysql_data:

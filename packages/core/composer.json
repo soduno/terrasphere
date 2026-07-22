@@ -1,0 +1,23 @@
+{
+    "name": "terrasphere/core",
+    "description": "The minimum application, routing, and view layer for TerraSphere CMS.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.5",
+        "illuminate/contracts": "^13.0",
+        "illuminate/support": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "TerraSphere\\Core\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TerraSphere\\Core\\CoreServiceProvider"
+            ]
+        }
+    }
+}

@@ -1,0 +1,13 @@
+:80 {
+    root * /var/www/html
+
+    @internal {
+        path_regexp ^/(?:\..*|artisan$|bootstrap(?:/|$)|Caddyfile$|composer\.(?:json|lock)$|compose\.ya?ml$|config(?:/|$)|docker(?:/|$)|Dockerfile$|extends(?:/|$)|node_modules(?:/|$)|packages(?:/|$)|README\.md$|routes(?:/|$)|storage(?:/|$)|vendor(?:/|$))
+    }
+
+    route {
+        respond @internal 404
+        php_fastcgi app:9000
+        file_server
+    }
+}
