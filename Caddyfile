@@ -2,7 +2,7 @@
     root * /var/www/html
 
     @internal {
-        path_regexp ^/(?:\..*|artisan$|bootstrap(?:/|$)|Caddyfile$|composer\.(?:json|lock)$|compose\.ya?ml$|config(?:/|$)|docker(?:/|$)|Dockerfile$|extends(?:/|$)|node_modules(?:/|$)|packages(?:/|$)|README\.md$|routes(?:/|$)|storage(?:/|$)|vendor(?:/|$))
+        path_regexp ^/(?:\..*|artisan$|bootstrap(?:/|$)|Caddyfile$|composer\.(?:json|lock)$|compose\.ya?ml$|config(?:/|$)|docker(?:/|$)|Dockerfile$|extends(?:/|$)|node_modules(?:/|$)|package(?:-lock)?\.json$|packages(?:/|$)|README\.md$|routes(?:/|$)|storage(?:/|$)|tsconfig\.json$|vendor(?:/|$)|vite\.config\.(?:js|ts)$)
     }
 
     route {

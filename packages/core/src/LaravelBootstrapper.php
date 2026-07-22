@@ -17,6 +17,7 @@ final class LaravelBootstrapper
 
         $app = new Application($basePath);
         $app->useBootstrapPath($corePath.'/bootstrap');
+        $app->usePublicPath($basePath);
         $app->useStoragePath($basePath.'/storage');
 
         return (new ApplicationBuilder($app))

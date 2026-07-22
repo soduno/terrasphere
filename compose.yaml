@@ -26,6 +26,20 @@ services:
             - app
         restart: unless-stopped
 
+    frontend:
+        image: node:24-alpine
+        profiles: ["docker-frontend"]
+        working_dir: /var/www/html
+        command: sh -c "npm install --no-audit --no-fund && npm run dev"
+        environment:
+            VITE_USE_POLLING: "true"
+        ports:
+            - "${VITE_PORT:-5173}:5173"
+        volumes:
+            - .:/var/www/html
+            - node_modules:/var/www/html/node_modules
+        restart: unless-stopped
+
     mysql:
         image: mysql:8.4
         ports:
@@ -53,3 +67,4 @@ volumes:
     caddy_data:
     composer_vendor:
     mysql_data:
+    node_modules:

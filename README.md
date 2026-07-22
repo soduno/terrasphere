@@ -47,3 +47,29 @@ The root `index.php` starts `TerraSphere\Core\Core` and has no direct Laravel
 dependency. Core owns maintenance mode, Laravel construction, request capture,
 and dispatch. `LaravelBootstrapper` is the internal adapter between TerraSphere
 Core and the underlying Laravel framework.
+
+## Administration UI
+
+The React, TypeScript, and Inertia administration UI is available at <http://localhost:8080/admin>.
+It is isolated to the `/admin` route; the public `/` entrypoint remains a normal
+Core-rendered Blade view. Start Vite directly on the host for fast hot module
+replacement on Windows:
+
+```bash
+npm install
+npm run dev
+```
+
+The optional Docker-based Vite service can be started with polling via:
+
+```bash
+docker compose --profile docker-frontend up -d frontend
+```
+
+Build production assets with:
+
+```bash
+docker compose run --rm frontend npm run build
+```
+
+Authentication has not been added yet, so `/admin` is currently public.
