@@ -20,7 +20,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
   };
 
   const isTextElement = element.type === 'heading' || element.type === 'text' || element.type === 'wysiwyg';
-  const isLayoutElement = element.type.startsWith('columns-');
+  const isLayoutElement = element.type === 'flex' || element.type === 'grid';
 
   return (
     <div className="w-[320px] bg-white dark:bg-gray-900 border-l border-gray-100 dark:border-gray-800 overflow-y-auto shadow-sm">
@@ -91,7 +91,9 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
                 <Label className="text-xs text-gray-500 dark:text-gray-400 uppercase">Layout</Label>
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <Label htmlFor="columnGap" className="text-xs text-gray-700 dark:text-gray-300">Column Gap</Label>
+                    <Label htmlFor="columnGap" className="text-xs text-gray-700 dark:text-gray-300">
+                      {element.type === 'flex' ? 'Gap' : 'Column Gap'}
+                    </Label>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{element.properties.columnGap || 20}px</span>
                   </div>
                   <Slider

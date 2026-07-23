@@ -62,6 +62,7 @@ export function EditorCanvas({
   return (
     <div 
       ref={drop}
+      onClick={() => setSelectedElement(null)}
       className={`flex-1 overflow-auto bg-white p-12 transition-all relative ${
         isOver && canDrop
           ? 'bg-indigo-500/5' 
@@ -146,6 +147,8 @@ export function EditorCanvas({
                   index={index}
                   isSelected={selectedElement === element.id}
                   onSelect={() => setSelectedElement(element.id)}
+                  selectedElement={selectedElement}
+                  onSelectElement={setSelectedElement}
                   onUpdate={updateElement}
                   onDelete={deleteElement}
                   onDuplicate={duplicateElement}

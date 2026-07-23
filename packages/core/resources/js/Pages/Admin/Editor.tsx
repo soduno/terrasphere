@@ -100,7 +100,19 @@ export default function Editor() {
     }
   };
 
-  const selectedElementData = elements.find((el) => el.id === selectedElement);
+  const findElement = (els: EditorElement[], id: string | null): EditorElement | undefined => {
+    if (!id) return undefined;
+
+    for (const element of els) {
+      if (element.id === id) return element;
+      const child = findElement(element.children || [], id);
+      if (child) return child;
+    }
+
+    return undefined;
+  };
+
+  const selectedElementData = findElement(elements, selectedElement);
 
   return (
     <DndProvider backend={HTML5Backend}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { EditorElement } from './ElementTypes';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
@@ -6,32 +6,63 @@ import { Calendar } from '../ui/calendar';
 
 interface ColumnElementProps {
   element: EditorElement;
+  isSelected: boolean;
+  onSelect: () => void;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onDelete: () => void;
 }
 
-export function ColumnElement({ element, onUpdate, onDelete }: ColumnElementProps) {
+export function ColumnElement({
+  element,
+  isSelected,
+  onSelect,
+  onUpdate,
+  onDelete,
+}: ColumnElementProps) {
+  const editableRef = useRef<HTMLDivElement>(null);
+  const draftContentRef = useRef<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-
-  const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
-    onUpdate(element.id, { content: e.currentTarget.innerHTML });
-  };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (element.type === 'text' || element.type === 'heading' || element.type === 'wysiwyg') {
       e.stopPropagation();
+      draftContentRef.current = e.currentTarget.innerHTML;
       setIsEditing(true);
     }
   };
 
-  const handleBlur = () => {
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    draftContentRef.current = e.currentTarget.innerHTML;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const content = draftContentRef.current ?? e.currentTarget.innerHTML;
+    draftContentRef.current = null;
+    onUpdate(element.id, { content });
     setIsEditing(false);
   };
+
+  useLayoutEffect(() => {
+    if (!isEditing && editableRef.current) {
+      const defaultContent =
+        element.type === 'heading'
+          ? 'Heading Text'
+          : element.type === 'wysiwyg'
+            ? '<p>Start writing...</p>'
+            : 'Click to edit...';
+      const content = element.content || defaultContent;
+
+      if (editableRef.current.innerHTML !== content) {
+        editableRef.current.innerHTML = content;
+      }
+    }
+  }, [element.content, element.type, isEditing]);
 
   const renderElement = () => {
     const style = {
       padding: `${element.properties.padding || 10}px`,
+      margin: `${element.properties.margin || 0}px 0`,
       backgroundColor: element.properties.backgroundColor || 'transparent',
       textAlign: element.properties.textAlign || 'left',
       fontSize: `${element.properties.fontSize || 14}px`,
@@ -43,48 +74,48 @@ export function ColumnElement({ element, onUpdate, onDelete }: ColumnElementProp
       case 'heading':
         return (
           <div
+            ref={editableRef}
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={handleDoubleClick}
+            onInput={handleInput}
             onBlur={handleBlur}
-            onInput={handleContentChange}
             style={style}
             className={`outline-none transition-all ${
               isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : ''
             } ${!isEditing ? 'cursor-text' : ''}`}
-            dangerouslySetInnerHTML={{ __html: element.content || 'Heading Text' }}
           />
         );
 
       case 'text':
         return (
           <div
+            ref={editableRef}
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={handleDoubleClick}
+            onInput={handleInput}
             onBlur={handleBlur}
-            onInput={handleContentChange}
             style={style}
             className={`outline-none transition-all ${
               isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : ''
             } ${!isEditing ? 'cursor-text' : ''}`}
-            dangerouslySetInnerHTML={{ __html: element.content || 'Click to edit...' }}
           />
         );
 
       case 'wysiwyg':
         return (
           <div
+            ref={editableRef}
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={handleDoubleClick}
+            onInput={handleInput}
             onBlur={handleBlur}
-            onInput={handleContentChange}
             style={style}
             className={`outline-none transition-all min-h-[60px] ${
               isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : ''
             } ${!isEditing ? 'cursor-text' : ''}`}
-            dangerouslySetInnerHTML={{ __html: element.content || '<p>Start writing...</p>' }}
           />
         );
 
@@ -118,6 +149,10 @@ export function ColumnElement({ element, onUpdate, onDelete }: ColumnElementProp
   return (
     <div
       className="relative group"
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -136,7 +171,7 @@ export function ColumnElement({ element, onUpdate, onDelete }: ColumnElementProp
       )}
 
       {/* Hover Border */}
-      {isHovered && !isEditing && (
+      {(isHovered || isSelected) && !isEditing && (
         <div className="absolute -inset-0.5 border border-indigo-400 dark:border-indigo-500 rounded-lg pointer-events-none animate-in fade-in duration-150" />
       )}
 

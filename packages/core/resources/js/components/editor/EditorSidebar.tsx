@@ -110,6 +110,8 @@ export function EditorSidebar({ onAddElement, showGridModal, hasContainerElement
           children: [],
           properties: {
             ...baseElement.properties,
+            width: '100%',
+            padding: '8',
             columnCount: 1,
           },
         };

@@ -20,6 +20,7 @@ export interface EditorElement {
     color?: string;
     borderRadius?: string;
     imageUrl?: string;
+    width?: string;
     columnGap?: string;
     columnCount?: number;
   };

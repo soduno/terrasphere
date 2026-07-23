@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Trash2, GripVertical, Copy, Eye, EyeOff, Plus } from 'lucide-react';
 import { EditorElement } from './ElementTypes';
@@ -11,6 +11,8 @@ interface DraggableElementProps {
   index: number;
   isSelected: boolean;
   onSelect: () => void;
+  selectedElement: string | null;
+  onSelectElement: (id: string) => void;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -24,6 +26,8 @@ export function DraggableElement({
   index,
   isSelected,
   onSelect,
+  selectedElement,
+  onSelectElement,
   onUpdate,
   onDelete,
   onDuplicate,
@@ -32,6 +36,8 @@ export function DraggableElement({
   columnIndex,
 }: DraggableElementProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const editableRef = useRef<HTMLDivElement>(null);
+  const draftContentRef = useRef<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -57,20 +63,40 @@ export function DraggableElement({
 
   preview(drop(ref));
 
-  const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
-    onUpdate(element.id, { content: e.currentTarget.innerHTML });
-  };
-
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (element.type === 'text' || element.type === 'heading' || element.type === 'wysiwyg') {
       e.stopPropagation();
+      draftContentRef.current = e.currentTarget.innerHTML;
       setIsEditing(true);
     }
   };
 
-  const handleBlur = () => {
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    draftContentRef.current = e.currentTarget.innerHTML;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const content = draftContentRef.current ?? e.currentTarget.innerHTML;
+    draftContentRef.current = null;
+    onUpdate(element.id, { content });
     setIsEditing(false);
   };
+
+  useLayoutEffect(() => {
+    if (!isEditing && editableRef.current) {
+      const defaultContent =
+        element.type === 'heading'
+          ? 'Heading Text'
+          : element.type === 'wysiwyg'
+            ? '<p>Start writing...</p>'
+            : 'Click to edit...';
+      const content = element.content || defaultContent;
+
+      if (editableRef.current.innerHTML !== content) {
+        editableRef.current.innerHTML = content;
+      }
+    }
+  }, [element.content, element.type, isEditing]);
 
   const getColumnCount = () => {
     if (element.type === 'flex' || element.type === 'grid') {
@@ -94,48 +120,48 @@ export function DraggableElement({
       case 'heading':
         return (
           <div
+            ref={editableRef}
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={handleDoubleClick}
+            onInput={handleInput}
             onBlur={handleBlur}
-            onInput={handleContentChange}
             style={style}
             className={`outline-none transition-all ${
               isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : ''
             } ${!isEditing ? 'cursor-text' : ''}`}
-            dangerouslySetInnerHTML={{ __html: element.content || 'Heading Text' }}
           />
         );
 
       case 'text':
         return (
           <div
+            ref={editableRef}
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={handleDoubleClick}
+            onInput={handleInput}
             onBlur={handleBlur}
-            onInput={handleContentChange}
             style={style}
             className={`outline-none transition-all ${
               isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : ''
             } ${!isEditing ? 'cursor-text' : ''}`}
-            dangerouslySetInnerHTML={{ __html: element.content || 'Click to edit...' }}
           />
         );
 
       case 'wysiwyg':
         return (
           <div
+            ref={editableRef}
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={handleDoubleClick}
+            onInput={handleInput}
             onBlur={handleBlur}
-            onInput={handleContentChange}
             style={style}
             className={`outline-none transition-all min-h-[100px] ${
               isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : ''
             } ${!isEditing ? 'cursor-text' : ''}`}
-            dangerouslySetInnerHTML={{ __html: element.content || '<p>Start writing...</p>' }}
           />
         );
 
@@ -169,6 +195,7 @@ export function DraggableElement({
             style={{
               ...style,
               display: element.type === 'flex' ? 'flex' : 'grid',
+              width: element.properties.width,
               gridTemplateColumns: element.type === 'grid' ? `repeat(${columnCount}, 1fr)` : undefined,
               gap: `${element.properties.columnGap || 20}px`,
             }}
@@ -184,7 +211,10 @@ export function DraggableElement({
                   columnIndex={idx}
                   parentId={element.id}
                   elements={columnElements}
+                  selectedElement={selectedElement}
+                  onSelectElement={onSelectElement}
                   onUpdate={onUpdate}
+                  elementGap={element.type === 'flex' ? element.properties.columnGap : undefined}
                   onAddToColumn={(newElement) => {
                     const newChildren = [...(element.children || [])];
                     newChildren.push({ ...newElement, columnIndex: idx });
@@ -210,19 +240,17 @@ export function DraggableElement({
   return (
     <div
       ref={ref}
-      onClick={onSelect}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`relative group transition-all ${isDragging ? 'opacity-40' : 'opacity-100'}`}
       style={{ opacity: isDragging ? 0.4 : 1 }}
     >
-      {/* Selection Border */}
-      {isSelected && (
-        <div className="absolute -inset-1 border-2 border-indigo-500 rounded-xl pointer-events-none z-10 shadow-lg shadow-indigo-500/20 animate-in fade-in duration-200" />
-      )}
-
       {/* Hover Overlay */}
-      {isHovered && !isEditing && (
+      {(isHovered || isSelected) && !isEditing && (
         <div className="absolute inset-0 bg-indigo-500/5 rounded-xl pointer-events-none z-[5] animate-in fade-in duration-150" />
       )}
 
