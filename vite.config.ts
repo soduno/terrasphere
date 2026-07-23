@@ -2,12 +2,23 @@ import inertia from '@inertiajs/vite'
 import react from '@vitejs/plugin-react'
 import laravel from 'laravel-vite-plugin'
 import { defineConfig, loadEnv } from 'vite'
+import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '')
     const usePolling = env.VITE_USE_POLLING === 'true'
 
     return {
+        resolve: {
+            alias: {
+                '@components': fileURLToPath(
+                    new URL('./packages/core/resources/js/components', import.meta.url),
+                ),
+                '@ui': fileURLToPath(
+                    new URL('./packages/core/resources/js/components/ui', import.meta.url),
+                ),
+            },
+        },
         plugins: [
             laravel({
                 publicDirectory: '.',

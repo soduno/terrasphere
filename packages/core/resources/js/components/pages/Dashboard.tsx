@@ -26,7 +26,7 @@ const recentPages = [
   { title: 'Blog Post #12', status: 'Scheduled', date: '5 days ago', views: 445 },
 ];
 
-export default function Dashboard() {
+export function Dashboard() {
   return (
     <div className="p-10">
       <div className="mb-10">

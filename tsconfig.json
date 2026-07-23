@@ -5,6 +5,12 @@
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "module": "ESNext",
         "moduleResolution": "Bundler",
+        "paths": {
+            "@components": ["./packages/core/resources/js/components"],
+            "@components/*": ["./packages/core/resources/js/components/*"],
+            "@ui": ["./packages/core/resources/js/components/ui"],
+            "@ui/*": ["./packages/core/resources/js/components/ui/*"]
+        },
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
@@ -15,7 +21,7 @@
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
         "skipLibCheck": true,
-        "types": ["vite/client"]
+        "types": ["vite/client", "node"]
     },
     "include": [
         "packages/core/resources/js/**/*.ts",
