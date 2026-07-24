@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
+import { motion } from 'motion/react';
 import { Trash2, Copy, Move, Settings } from 'lucide-react';
 import { EditorElement } from './ElementTypes';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
@@ -334,16 +335,20 @@ export function DraggableElement({
   };
 
   return (
-    <div
+    <motion.div
       ref={ref}
       data-editor-element-id={element.id}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
       }}
-      className={`relative group transition-all ${isDragging ? 'opacity-40' : 'opacity-100'}`}
-      style={{
+      animate={{
         opacity: isDragging ? 0.4 : 1,
+        scale: isDragging ? 0.985 : 1,
+      }}
+      transition={{ duration: 0.16, ease: 'easeOut' }}
+      className="relative group"
+      style={{
         float:
           element.properties.float && element.properties.float !== 'none'
             ? element.properties.float
@@ -373,7 +378,7 @@ export function DraggableElement({
 
       {/* Action Buttons */}
       {(isHovered || (isSelected && hoveredElement === null)) && !isEditing && (
-        <div className="absolute -top-6 left-1/2 z-20 flex h-6 -translate-x-1/2 items-center rounded-sm bg-indigo-600 px-1 text-white animate-in fade-in duration-150">
+        <div className="absolute -top-6 left-1/2 z-20 flex h-6 -translate-x-1/2 items-center rounded-t-sm bg-indigo-600 px-1 text-white animate-in fade-in duration-150">
           <span
             ref={(node) => {
               drag(node);
@@ -443,6 +448,6 @@ export function DraggableElement({
           Double-click to edit
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

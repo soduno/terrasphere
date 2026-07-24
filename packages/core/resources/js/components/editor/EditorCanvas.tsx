@@ -2,6 +2,7 @@ import { EditorElement } from './ElementTypes';
 import { DraggableElement } from './DraggableElement';
 import { useDrop } from 'react-dnd';
 import { useState } from 'react';
+import { motion } from 'motion/react';
 
 interface EditorCanvasProps {
   elements: EditorElement[];
@@ -155,8 +156,17 @@ export function EditorCanvas({
             const shouldBlur = !hasContainerElements || isContainer;
             
             return (
-              <div
+              <motion.div
                 key={element.id}
+                layout="position"
+                transition={{
+                  layout: {
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 38,
+                    mass: 0.55,
+                  },
+                }}
                 className={`transition-all duration-300 ${
                   !shouldBlur ? 'blur-sm opacity-50 pointer-events-none' : ''
                 }`}
@@ -174,7 +184,7 @@ export function EditorCanvas({
                   onDuplicate={duplicateElement}
                   onMove={moveElement}
                 />
-              </div>
+              </motion.div>
             );
           })}
           {!hasContainerElements && elements.length > 0 && (

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDrag, useDrop } from 'react-dnd';
+import { motion } from 'motion/react';
 import { AlignCenter, AlignLeft, AlignRight, Copy, Move, Settings, Trash2 } from 'lucide-react';
 import { EditorElement } from './ElementTypes';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
@@ -504,8 +505,23 @@ export function ColumnElement({
   };
 
   return (
-    <div
+    <motion.div
       ref={elementRef}
+      layout="position"
+      animate={{
+        opacity: isDragging ? 0.4 : 1,
+        scale: isDragging ? 0.985 : 1,
+      }}
+      transition={{
+        layout: {
+          type: 'spring',
+          stiffness: 500,
+          damping: 38,
+          mass: 0.55,
+        },
+        opacity: { duration: 0.16 },
+        scale: { duration: 0.16, ease: 'easeOut' },
+      }}
       className={`relative group ${embeddedImage ? 'z-30' : ''}`}
       data-editor-element-id={element.id}
       onClick={(e) => {
@@ -513,7 +529,6 @@ export function ColumnElement({
         onSelect();
       }}
       style={{
-        opacity: isDragging ? 0.4 : 1,
         display: floatDirection === 'none' ? 'flex' : 'flow-root',
         flex: floatDirection === 'none' ? '1 1 0%' : undefined,
         flexDirection: floatDirection === 'none' ? 'column' : undefined,
@@ -755,7 +770,7 @@ export function ColumnElement({
 
       {/* Element Toolbar */}
       {showToolbar && !isEditing && (
-        <div className="absolute -top-6 left-1/2 z-20 flex h-6 -translate-x-1/2 items-center rounded-sm bg-indigo-600 px-1 text-white animate-in fade-in duration-150">
+        <div className="absolute -top-6 left-1/2 z-20 flex h-6 -translate-x-1/2 items-center rounded-t-sm bg-indigo-600 px-1 text-white animate-in fade-in duration-150">
           <span
             ref={(node) => {
               drag(node);
@@ -844,6 +859,6 @@ export function ColumnElement({
           Double-click
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
