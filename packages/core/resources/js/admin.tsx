@@ -5,5 +5,5 @@ import './admin.scss'
 createInertiaApp({
     pages: './Pages',
     strictMode: true,
-    layout: () => AdminLayout,
+    layout: (name) => name === 'Admin/Login' ? undefined : AdminLayout,
 })

@@ -72,4 +72,12 @@ Build production assets with:
 docker compose run --rm frontend npm run build
 ```
 
-Authentication has not been added yet, so `/admin` is currently public.
+The administration area is protected by session authentication. Create the
+first administrator, then sign in at <http://localhost:8080/admin/login>:
+
+```bash
+php artisan terrasphere:admin admin@example.com --username=admin
+```
+
+The command prompts securely for a password. When using Docker, prefix the
+command with `docker compose exec app`.
