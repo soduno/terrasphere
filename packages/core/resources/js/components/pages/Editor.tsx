@@ -5,7 +5,11 @@ import { EditorSidebar } from '../editor/EditorSidebar';
 import { EditorCanvas } from '../editor/EditorCanvas';
 import { EditorToolbar } from '../editor/EditorToolbar';
 import { EditorProperties } from '../editor/EditorProperties';
-import { EditorElement } from '../editor/ElementTypes';
+import {
+  moveElementBetweenColumns,
+  type ColumnElementDragItem,
+  type EditorElement,
+} from '../editor/ElementTypes';
 
 export function Editor() {
   const [elements, setElements] = useState<EditorElement[]>([]);
@@ -81,6 +85,23 @@ export function Editor() {
     setElements(newElements);
   };
 
+  const moveElementToColumn = (
+    item: ColumnElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => {
+    setElements((currentElements) =>
+      moveElementBetweenColumns(
+        currentElements,
+        item,
+        targetParentId,
+        targetColumnIndex,
+        insertionIndex,
+      )
+    );
+  };
+
   const duplicateElement = (id: string) => {
     const findAndDuplicate = (els: EditorElement[]): EditorElement[] | null => {
       for (let i = 0; i < els.length; i++) {
@@ -132,6 +153,7 @@ export function Editor() {
             deleteElement={deleteElement}
             duplicateElement={duplicateElement}
             moveElement={moveElement}
+            moveElementToColumn={moveElementToColumn}
             addElement={addElement}
             hasContainerElements={hasContainerElements}
           />

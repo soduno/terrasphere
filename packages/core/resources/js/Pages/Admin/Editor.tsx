@@ -9,7 +9,11 @@ import {
   normalizePropertySectionOrder,
   type PropertySectionId,
 } from '@components/editor/EditorProperties';
-import { EditorElement } from '@components/editor/ElementTypes';
+import {
+  moveElementBetweenColumns,
+  type ColumnElementDragItem,
+  type EditorElement,
+} from '@components/editor/ElementTypes';
 
 interface EditorProps {
   page: {
@@ -139,6 +143,23 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
     setElements(newElements);
   };
 
+  const moveElementToColumn = (
+    item: ColumnElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => {
+    setElements((currentElements) =>
+      moveElementBetweenColumns(
+        currentElements,
+        item,
+        targetParentId,
+        targetColumnIndex,
+        insertionIndex,
+      )
+    );
+  };
+
   const duplicateElement = (id: string) => {
     const findAndDuplicate = (els: EditorElement[]): EditorElement[] | null => {
       for (let i = 0; i < els.length; i++) {
@@ -213,6 +234,7 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
             deleteElement={deleteElement}
             duplicateElement={duplicateElement}
             moveElement={moveElement}
+            moveElementToColumn={moveElementToColumn}
             addElement={addElement}
             hasContainerElements={hasContainerElements}
           />

@@ -3,14 +3,19 @@ import { createPortal } from 'react-dom';
 import { useDrag, useDrop } from 'react-dnd';
 import { motion } from 'motion/react';
 import { AlignCenter, AlignLeft, AlignRight, Copy, Move, Settings, Trash2 } from 'lucide-react';
-import { EditorElement } from './ElementTypes';
+import {
+  COLUMN_ELEMENT_DRAG_TYPE,
+  type ColumnElementDragItem,
+  type EditorElement,
+} from './ElementTypes';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { Calendar } from '../ui/calendar';
 
 interface ColumnElementProps {
   element: EditorElement;
   index: number;
-  dragType: string;
+  parentId: string;
+  columnIndex: number;
   elementGap: string;
   isLast: boolean;
   isSelected: boolean;
@@ -18,14 +23,17 @@ interface ColumnElementProps {
   showToolbar: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
-  onMove: (dragIndex: number, hoverIndex: number) => void;
+  onMove: (item: ColumnElementDragItem, insertionIndex: number) => void;
   onInsertNew: (element: EditorElement, insertionIndex: number) => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }
 
 interface ColumnDropItem {
-  index?: number;
+  elementId?: string;
+  sourceParentId?: string;
+  sourceColumnIndex?: number;
+  sourceIndex?: number;
   dropPosition?: 'before' | 'after';
   elementType?: EditorElement['type'];
   createElement?: () => EditorElement;
@@ -48,7 +56,8 @@ interface EmbeddedImageOverlay {
 export function ColumnElement({
   element,
   index,
-  dragType,
+  parentId,
+  columnIndex,
   elementGap,
   isLast,
   isSelected,
@@ -126,9 +135,14 @@ export function ColumnElement({
     }
   };
 
-  const [{ isDragging }, drag, preview] = useDrag({
-    type: dragType,
-    item: { index },
+  const [{ isDragging }, drag, preview] = useDrag<ColumnElementDragItem, void, { isDragging: boolean }>({
+    type: COLUMN_ELEMENT_DRAG_TYPE,
+    item: {
+      elementId: element.id,
+      sourceParentId: parentId,
+      sourceColumnIndex: columnIndex,
+      sourceIndex: index,
+    },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
@@ -150,9 +164,9 @@ export function ColumnElement({
       isOverNewElementTarget: boolean;
     }
   >({
-    accept: [dragType, 'new-element', embeddedDragType],
+    accept: [COLUMN_ELEMENT_DRAG_TYPE, 'new-element', embeddedDragType],
     canDrop: (item, monitor) => {
-      if (monitor.getItemType() === dragType) return true;
+      if (monitor.getItemType() === COLUMN_ELEMENT_DRAG_TYPE) return true;
       if (monitor.getItemType() === embeddedDragType) return !!item.embeddedImageId;
       return !item.isLayout;
     },
@@ -265,15 +279,22 @@ export function ColumnElement({
         return { handled: true };
       }
 
-      if (item.index === undefined || item.index === index) return;
+      if (
+        !item.elementId
+        || item.sourceParentId === undefined
+        || item.sourceColumnIndex === undefined
+        || item.sourceIndex === undefined
+      ) return;
+      if (item.elementId === element.id) return { handled: true };
       const insertionIndex =
         (item.dropPosition ?? dropPosition) === 'after' ? index + 1 : index;
-      onMove(item.index, insertionIndex);
+      onMove(item as ColumnElementDragItem, insertionIndex);
       return { handled: true };
     },
     collect: (monitor) => ({
       isOverTarget:
-        monitor.isOver({ shallow: true }) && monitor.getItemType() === dragType,
+        monitor.isOver({ shallow: true })
+        && monitor.getItemType() === COLUMN_ELEMENT_DRAG_TYPE,
       isOverImageTarget:
         monitor.isOver({ shallow: true })
         && monitor.getItemType() === 'new-element'
@@ -508,6 +529,7 @@ export function ColumnElement({
     <motion.div
       ref={elementRef}
       layout="position"
+      layoutId={`editor-element-${element.id}`}
       animate={{
         opacity: isDragging ? 0.4 : 1,
         scale: isDragging ? 0.985 : 1,

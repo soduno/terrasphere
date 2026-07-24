@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useDrop } from 'react-dnd';
-import { EditorElement } from './ElementTypes';
+import {
+  COLUMN_ELEMENT_DRAG_TYPE,
+  type ColumnElementDragItem,
+  type EditorElement,
+} from './ElementTypes';
 import { ColumnElement } from './ColumnElement';
 import { Plus } from 'lucide-react';
 
@@ -14,7 +18,7 @@ interface ColumnDropZoneProps {
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onAddToColumn: (element: EditorElement, insertionIndex?: number) => void;
   onDuplicateFromColumn: (childId: string) => void;
-  onMoveInColumn: (dragIndex: number, hoverIndex: number) => void;
+  onMoveElement: (item: ColumnElementDragItem, insertionIndex: number) => void;
   onDeleteFromColumn: (childId: string) => void;
   elementGap?: string;
 }
@@ -23,6 +27,8 @@ interface NewElementDropItem {
   createElement: (columnCount?: number) => EditorElement;
   isLayout?: boolean;
 }
+
+type ColumnDropItem = NewElementDropItem | ColumnElementDragItem;
 
 export function ColumnDropZone({
   columnIndex,
@@ -34,24 +40,31 @@ export function ColumnDropZone({
   onUpdate,
   onAddToColumn,
   onDuplicateFromColumn,
-  onMoveInColumn,
+  onMoveElement,
   onDeleteFromColumn,
   elementGap,
 }: ColumnDropZoneProps) {
   const [justDropped, setJustDropped] = useState(false);
   
   const [{ isOver, canDrop }, drop] = useDrop<
-    NewElementDropItem,
+    ColumnDropItem,
     { handled: true } | void,
     { isOver: boolean; canDrop: boolean }
   >({
-    accept: 'new-element',
+    accept: ['new-element', COLUMN_ELEMENT_DRAG_TYPE],
     drop: (item, monitor) => {
       if (monitor.didDrop()) {
         return { handled: true };
       }
 
-      const newElement = item.createElement();
+      if (monitor.getItemType() === COLUMN_ELEMENT_DRAG_TYPE) {
+        onMoveElement(item as ColumnElementDragItem, elements.length);
+        setJustDropped(true);
+        setTimeout(() => setJustDropped(false), 600);
+        return { handled: true };
+      }
+
+      const newElement = (item as NewElementDropItem).createElement();
       newElement.id = `col-element-${Date.now()}-${Math.random()}`;
       onAddToColumn(newElement);
 
@@ -62,6 +75,7 @@ export function ColumnDropZone({
       return { handled: true }; // Signal that we handled this drop
     },
     canDrop: (item) => {
+      if ('elementId' in item) return true;
       // Don't allow layout elements inside containers
       return !item.isLayout;
     },
@@ -106,7 +120,8 @@ export function ColumnDropZone({
               key={element.id}
               element={element}
               index={index}
-              dragType={`column-element-${parentId}-${columnIndex}`}
+              parentId={parentId}
+              columnIndex={columnIndex}
               elementGap={elementGap ?? '8'}
               isLast={index === elements.length - 1}
               isSelected={selectedElement === element.id}
@@ -117,7 +132,7 @@ export function ColumnDropZone({
               }
               onSelect={() => onSelectElement(element.id)}
               onUpdate={onUpdate}
-              onMove={onMoveInColumn}
+              onMove={onMoveElement}
               onInsertNew={(newElement, insertionIndex) =>
                 onAddToColumn(newElement, insertionIndex)
               }

@@ -1,4 +1,4 @@
-import { EditorElement } from './ElementTypes';
+import { type ColumnElementDragItem, type EditorElement } from './ElementTypes';
 import { DraggableElement } from './DraggableElement';
 import { useDrop } from 'react-dnd';
 import { useState } from 'react';
@@ -12,6 +12,12 @@ interface EditorCanvasProps {
   deleteElement: (id: string) => void;
   duplicateElement: (id: string) => void;
   moveElement: (dragIndex: number, hoverIndex: number) => void;
+  moveElementToColumn: (
+    item: ColumnElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => void;
   addElement: (element: EditorElement) => void;
   hasContainerElements: boolean;
 }
@@ -29,6 +35,7 @@ export function EditorCanvas({
   deleteElement,
   duplicateElement,
   moveElement,
+  moveElementToColumn,
   addElement,
   hasContainerElements,
 }: EditorCanvasProps) {
@@ -183,6 +190,7 @@ export function EditorCanvas({
                   onDelete={deleteElement}
                   onDuplicate={duplicateElement}
                   onMove={moveElement}
+                  onMoveElementToColumn={moveElementToColumn}
                 />
               </motion.div>
             );

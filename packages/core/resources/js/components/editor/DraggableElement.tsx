@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { motion } from 'motion/react';
 import { Trash2, Copy, Move, Settings } from 'lucide-react';
-import { EditorElement } from './ElementTypes';
+import { type ColumnElementDragItem, type EditorElement } from './ElementTypes';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { Calendar } from '../ui/calendar';
 import { ColumnDropZone } from './ColumnDropZone';
@@ -19,6 +19,12 @@ interface DraggableElementProps {
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   onMove: (dragIndex: number, hoverIndex: number) => void;
+  onMoveElementToColumn: (
+    item: ColumnElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => void;
   parentId?: string;
   columnIndex?: number;
 }
@@ -35,6 +41,7 @@ export function DraggableElement({
   onDelete,
   onDuplicate,
   onMove,
+  onMoveElementToColumn,
 }: DraggableElementProps) {
   const ref = useRef<HTMLDivElement>(null);
   const editableRef = useRef<HTMLDivElement>(null);
@@ -298,25 +305,14 @@ export function DraggableElement({
                     newChildren.splice(childIndex + 1, 0, duplicate);
                     onUpdate(element.id, { children: newChildren });
                   }}
-                  onMoveInColumn={(dragIndex, insertionIndex) => {
-                    const newChildren = [...(element.children || [])];
-                    const columnChildren = newChildren.filter(
-                      (child) => (child.columnIndex ?? 0) === idx
-                    );
-                    const [movedChild] = columnChildren.splice(dragIndex, 1);
-                    if (!movedChild) return;
-
-                    const adjustedIndex =
-                      dragIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
-                    columnChildren.splice(adjustedIndex, 0, movedChild);
-                    let columnChildIndex = 0;
-                    const reorderedChildren = newChildren.map((child) =>
-                      (child.columnIndex ?? 0) === idx
-                        ? columnChildren[columnChildIndex++]
-                        : child
-                    );
-                    onUpdate(element.id, { children: reorderedChildren });
-                  }}
+                  onMoveElement={(item, insertionIndex) =>
+                    onMoveElementToColumn(
+                      item,
+                      element.id,
+                      idx,
+                      insertionIndex,
+                    )
+                  }
                   onDeleteFromColumn={(childId) => {
                     const newChildren = (element.children || []).filter(
                       (child) => child.id !== childId
