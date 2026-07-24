@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { useDrag, useDrop } from 'react-dnd';
 import { EditorElement } from './ElementTypes';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -16,6 +17,7 @@ import {
   AlignRight,
   ChevronDown,
   ChevronUp,
+  GripVertical,
   Lock,
   Minus,
   MousePointer2,
@@ -25,9 +27,43 @@ import {
 interface EditorPropertiesProps {
   element?: EditorElement;
   updateElement: (id: string, updates: Partial<EditorElement>) => void;
+  sectionOrder?: PropertySectionId[];
+  onSectionOrderChange?: (order: PropertySectionId[]) => void;
 }
 
-export function EditorProperties({ element, updateElement }: EditorPropertiesProps) {
+export const PROPERTY_SECTION_IDS = [
+  'spacing',
+  'horizontal-alignment',
+  'vertical-alignment',
+  'layout',
+  'typography',
+  'appearance',
+  'image',
+  'float',
+] as const;
+
+export type PropertySectionId = typeof PROPERTY_SECTION_IDS[number];
+
+export function normalizePropertySectionOrder(order: readonly string[]): PropertySectionId[] {
+  const validIds = new Set<PropertySectionId>(PROPERTY_SECTION_IDS);
+  const savedIds = order.filter(
+    (id): id is PropertySectionId => validIds.has(id as PropertySectionId)
+  );
+
+  return [...new Set([...savedIds, ...PROPERTY_SECTION_IDS])];
+}
+
+export function EditorProperties({
+  element,
+  updateElement,
+  sectionOrder: savedSectionOrder = [...PROPERTY_SECTION_IDS],
+  onSectionOrderChange = () => undefined,
+}: EditorPropertiesProps) {
+  const [sectionOrder, setSectionOrder] = useState<PropertySectionId[]>(
+    () => normalizePropertySectionOrder(savedSectionOrder)
+  );
+  const sectionOrderRef = useRef(sectionOrder);
+
   if (!element) {
     return (
       <aside className="w-[320px] shrink-0 bg-white dark:bg-gray-900 border-l border-gray-100 dark:border-gray-800">
@@ -82,6 +118,28 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
     ?? (element.type === 'image' ? element.properties.imageAlign : undefined)
     ?? (element.type === 'calendar' ? 'center' : 'left');
 
+  const moveSection = (dragIndex: number, hoverIndex: number) => {
+    setSectionOrder((currentOrder) => {
+      const nextOrder = [...currentOrder];
+      const [draggedSection] = nextOrder.splice(dragIndex, 1);
+      if (!draggedSection) return currentOrder;
+      nextOrder.splice(hoverIndex, 0, draggedSection);
+      sectionOrderRef.current = nextOrder;
+      return nextOrder;
+    });
+  };
+
+  const persistSectionOrder = () => {
+    onSectionOrderChange(sectionOrderRef.current);
+  };
+
+  const sortableSectionProps = (sectionId: PropertySectionId) => ({
+    sectionId,
+    position: sectionOrder.indexOf(sectionId),
+    onMove: moveSection,
+    onDrop: persistSectionOrder,
+  });
+
   return (
     <aside className="w-[320px] shrink-0 bg-white dark:bg-gray-900 border-l border-gray-100 dark:border-gray-800 overflow-y-auto shadow-sm">
       <div className="p-6">
@@ -92,9 +150,9 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
           </p>
         </div>
 
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           {/* Element Type */}
-          <div>
+          <div className="order-[-1]">
             <Label className="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Element</Label>
             <div className="mt-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <p className="text-sm text-gray-900 dark:text-white capitalize">
@@ -104,7 +162,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
           </div>
 
           {/* Spacing */}
-          <PropertySection title="Spacing" defaultOpen>
+          <PropertySection title="Spacing" defaultOpen {...sortableSectionProps('spacing')}>
             <div className="space-y-4">
             <SpacingControl
               kind="padding"
@@ -124,7 +182,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
 
           {isContentOrMediaElement && (
             <>
-              <PropertySection title="Horizontal alignment">
+              <PropertySection title="Horizontal alignment" {...sortableSectionProps('horizontal-alignment')}>
                 <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
                   {([
@@ -159,7 +217,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
                 </div>
               </PropertySection>
 
-              <PropertySection title="Vertical alignment">
+              <PropertySection title="Vertical alignment" {...sortableSectionProps('vertical-alignment')}>
                 <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
                   {([
@@ -197,7 +255,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
           )}
 
           {isLayoutElement && (
-            <PropertySection title="Layout">
+            <PropertySection title="Layout" {...sortableSectionProps('layout')}>
               <div className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -221,7 +279,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
           )}
 
           {isTextElement && (
-            <PropertySection title="Typography">
+            <PropertySection title="Typography" {...sortableSectionProps('typography')}>
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -263,7 +321,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
           )}
 
           {/* Background & Style */}
-          <PropertySection title="Appearance">
+          <PropertySection title="Appearance" {...sortableSectionProps('appearance')}>
             <div className="space-y-4">
             <div>
               <Label htmlFor="backgroundColor" className="text-xs text-gray-700 dark:text-gray-300 mb-2 block">Background</Label>
@@ -304,7 +362,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
           </PropertySection>
 
           {element.type === 'image' && (
-            <PropertySection title="Image">
+            <PropertySection title="Image" {...sortableSectionProps('image')}>
               <div className="space-y-3">
                 <div>
                   <Label htmlFor="imageUrl" className="text-xs text-gray-700 dark:text-gray-300 mb-2 block">Image URL</Label>
@@ -376,7 +434,7 @@ export function EditorProperties({ element, updateElement }: EditorPropertiesPro
             </PropertySection>
           )}
 
-          <PropertySection title="Float">
+          <PropertySection title="Float" {...sortableSectionProps('float')}>
             <div className="space-y-2">
             <div className="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
               {(['none', 'left', 'right'] as const).map((float) => {
@@ -413,32 +471,87 @@ interface PropertySectionProps {
   title: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  sectionId: PropertySectionId;
+  position: number;
+  onMove: (dragIndex: number, hoverIndex: number) => void;
+  onDrop: () => void;
 }
 
 function PropertySection({
   title,
   children,
   defaultOpen = false,
+  sectionId,
+  position,
+  onMove,
+  onDrop,
 }: PropertySectionProps) {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLButtonElement>(null);
+  const [{ isDragging }, drag] = useDrag({
+    type: 'property-section',
+    item: { id: sectionId, index: position },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+  const [, drop] = useDrop({
+    accept: 'property-section',
+    hover: (item: { id: PropertySectionId; index: number }, monitor) => {
+      if (!sectionRef.current || item.id === sectionId) return;
+
+      const bounds = sectionRef.current.getBoundingClientRect();
+      const pointer = monitor.getClientOffset();
+      if (!pointer) return;
+
+      const middle = (bounds.bottom - bounds.top) / 2;
+      const pointerOffset = pointer.y - bounds.top;
+      if (item.index < position && pointerOffset < middle) return;
+      if (item.index > position && pointerOffset > middle) return;
+
+      onMove(item.index, position);
+      item.index = position;
+    },
+    drop: onDrop,
+  });
+
+  drag(handleRef);
+  drop(sectionRef);
+
   return (
-    <Accordion
-      type="single"
-      collapsible
-      defaultValue={defaultOpen ? 'content' : undefined}
-      className="w-full"
+    <div
+      ref={sectionRef}
+      style={{ order: position }}
+      className={`relative transition-opacity ${isDragging ? 'opacity-40' : 'opacity-100'}`}
     >
-      <AccordionItem
-        value="content"
-        className="overflow-hidden rounded-xl border border-gray-200 bg-white px-4 shadow-sm last:border-b dark:border-gray-700 dark:bg-gray-900"
+      <button
+        ref={handleRef}
+        type="button"
+        aria-label={`Drag to reorder ${title}`}
+        title={`Drag to reorder ${title}`}
+        className="absolute left-2.5 top-3.5 z-10 cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing dark:text-gray-500 dark:hover:text-gray-300"
       >
-        <AccordionTrigger className="py-3 text-xs font-medium uppercase tracking-wide text-gray-600 hover:no-underline dark:text-gray-300">
-          {title}
-        </AccordionTrigger>
-        <AccordionContent className="pb-4">
-          {children}
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+        <GripVertical className="size-3.5" />
+      </button>
+      <Accordion
+        type="single"
+        collapsible
+        defaultValue={defaultOpen ? 'content' : undefined}
+        className="w-full"
+      >
+        <AccordionItem
+          value="content"
+          className="overflow-hidden rounded-xl border border-gray-200 bg-white px-4 shadow-sm last:border-b dark:border-gray-700 dark:bg-gray-900"
+        >
+          <AccordionTrigger className="py-3 pl-4 text-xs font-medium uppercase tracking-wide text-gray-600 hover:no-underline dark:text-gray-300">
+            {title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            {children}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
   );
 }
 

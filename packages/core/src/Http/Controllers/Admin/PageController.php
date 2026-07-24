@@ -51,9 +51,10 @@ final class PageController
             : redirect()->route('terrasphere.admin.fields-builder', $page);
     }
 
-    public function editWysiwyg(Page $page): Response
+    public function editWysiwyg(Request $request, Page $page): Response
     {
         abort_unless($page->content_type === 'wysiwyg', 404);
+        $userSettings = $request->user()?->settings?->settings ?? [];
 
         return Inertia::render('Admin/Editor', [
             'page' => [
@@ -63,6 +64,7 @@ final class PageController
                 'lockVersion' => $page->lock_version,
                 'updatedAt' => $page->updated_at?->toISOString(),
             ],
+            'propertySectionOrder' => $userSettings['editor']['property_section_order'] ?? [],
         ]);
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use TerraSphere\Core\Http\Controllers\Admin\AuthenticationController;
 use TerraSphere\Core\Http\Controllers\Admin\DashboardController;
 use TerraSphere\Core\Http\Controllers\Admin\PageController;
+use TerraSphere\Core\Http\Controllers\Admin\UserSettingController;
 use TerraSphere\Core\Http\Middleware\HandleAdminInertiaRequests;
 use TerraSphere\Core\Http\Middleware\RequireAdminAuthentication;
 
@@ -34,6 +35,10 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
             Route::get('/editor/{page}', [PageController::class, 'editWysiwyg'])->name('editor');
             Route::put('/pages/{page}/wysiwyg', [PageController::class, 'saveWysiwyg'])
                 ->name('pages.wysiwyg.update');
+            Route::put(
+                '/user-settings/editor/property-order',
+                [UserSettingController::class, 'updateEditorPropertyOrder']
+            )->name('user-settings.editor.property-order.update');
             Route::get('/fields-builder/{page}', [PageController::class, 'editFieldSchema'])
                 ->name('fields-builder');
             Route::put('/pages/{page}/field-schema', [PageController::class, 'saveFieldSchema'])

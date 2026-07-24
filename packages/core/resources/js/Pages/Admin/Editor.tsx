@@ -4,7 +4,11 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { EditorSidebar } from '@components/editor/EditorSidebar';
 import { EditorCanvas } from '@components/editor/EditorCanvas';
 import { EditorToolbar } from '@components/editor/EditorToolbar';
-import { EditorProperties } from '@components/editor/EditorProperties';
+import {
+  EditorProperties,
+  normalizePropertySectionOrder,
+  type PropertySectionId,
+} from '@components/editor/EditorProperties';
 import { EditorElement } from '@components/editor/ElementTypes';
 
 interface EditorProps {
@@ -15,14 +19,17 @@ interface EditorProps {
     lockVersion: number;
     updatedAt: string | null;
   };
+  propertySectionOrder: string[];
 }
 
-export default function Editor({ page }: EditorProps) {
+export default function Editor({ page, propertySectionOrder }: EditorProps) {
   const [elements, setElements] = useState<EditorElement[]>(page.elements);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [showGridModal, setShowGridModal] = useState(false);
-  const [pendingGridElement, setPendingGridElement] = useState<EditorElement | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [orderedPropertySections, setOrderedPropertySections] = useState<PropertySectionId[]>(
+    () => normalizePropertySectionOrder(propertySectionOrder)
+  );
   const lockVersionRef = useRef(page.lockVersion);
   const lastSavedElementsRef = useRef(JSON.stringify(page.elements));
 
@@ -166,6 +173,29 @@ export default function Editor({ page }: EditorProps) {
 
   const selectedElementData = findElement(elements, selectedElement);
 
+  const savePropertySectionOrder = async (order: PropertySectionId[]) => {
+    setOrderedPropertySections(order);
+
+    const csrfToken = document
+      .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+      ?.content;
+
+    try {
+      const response = await fetch('/admin/user-settings/editor/property-order', {
+        method: 'PUT',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken || '',
+        },
+        body: JSON.stringify({ property_section_order: order }),
+      });
+      if (!response.ok) throw new Error('Unable to save property order');
+    } catch {
+      // Keep the optimistic order for this session if persistence is temporarily unavailable.
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
@@ -189,6 +219,8 @@ export default function Editor({ page }: EditorProps) {
           <EditorProperties
             element={selectedElementData}
             updateElement={updateElement}
+            sectionOrder={orderedPropertySections}
+            onSectionOrderChange={savePropertySectionOrder}
           />
         </div>
       </div>
