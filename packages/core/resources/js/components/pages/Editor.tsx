@@ -10,7 +10,6 @@ import { EditorElement } from '../editor/ElementTypes';
 export function Editor() {
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
-  const [showProperties, setShowProperties] = useState(true);
   const [showGridModal, setShowGridModal] = useState(false);
   const [pendingGridElement, setPendingGridElement] = useState<EditorElement | null>(null);
 
@@ -25,8 +24,8 @@ export function Editor() {
       id: `element-${Date.now()}`,
       type: 'grid',
       properties: { 
-        padding: '20',
-        margin: '10',
+        padding: '0',
+        margin: '0',
         backgroundColor: 'transparent',
         textAlign: 'left',
         fontSize: '16',
@@ -72,11 +71,13 @@ export function Editor() {
     }
   };
 
-  const moveElement = (dragIndex: number, hoverIndex: number) => {
-    const draggedElement = elements[dragIndex];
+  const moveElement = (dragIndex: number, insertionIndex: number) => {
     const newElements = [...elements];
-    newElements.splice(dragIndex, 1);
-    newElements.splice(hoverIndex, 0, draggedElement);
+    const [draggedElement] = newElements.splice(dragIndex, 1);
+    if (!draggedElement) return;
+
+    const adjustedIndex = dragIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
+    newElements.splice(adjustedIndex, 0, draggedElement);
     setElements(newElements);
   };
 
@@ -117,7 +118,10 @@ export function Editor() {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
-        <EditorToolbar setShowProperties={setShowProperties} showProperties={showProperties} />
+        <EditorToolbar
+          title="Untitled Page"
+          saveStatus="saved"
+        />
         <div className="flex-1 flex overflow-hidden">
           <EditorSidebar onAddElement={addElement} showGridModal={() => setShowGridModal(true)} hasContainerElements={hasContainerElements} />
           <EditorCanvas
@@ -131,12 +135,10 @@ export function Editor() {
             addElement={addElement}
             hasContainerElements={hasContainerElements}
           />
-          {showProperties && selectedElementData && (
-            <EditorProperties
-              element={selectedElementData}
-              updateElement={updateElement}
-            />
-          )}
+          <EditorProperties
+            element={selectedElementData}
+            updateElement={updateElement}
+          />
         </div>
       </div>
 

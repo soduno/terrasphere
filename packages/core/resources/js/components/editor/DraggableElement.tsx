@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Trash2, GripVertical, Copy, Eye, EyeOff, Plus } from 'lucide-react';
+import { Trash2, Copy, Move, Settings } from 'lucide-react';
 import { EditorElement } from './ElementTypes';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { Calendar } from '../ui/calendar';
@@ -10,6 +10,7 @@ interface DraggableElementProps {
   element: EditorElement;
   index: number;
   isSelected: boolean;
+  hoveredElement: string | null;
   onSelect: () => void;
   selectedElement: string | null;
   onSelectElement: (id: string) => void;
@@ -25,6 +26,7 @@ export function DraggableElement({
   element,
   index,
   isSelected,
+  hoveredElement,
   onSelect,
   selectedElement,
   onSelectElement,
@@ -32,14 +34,13 @@ export function DraggableElement({
   onDelete,
   onDuplicate,
   onMove,
-  parentId,
-  columnIndex,
 }: DraggableElementProps) {
   const ref = useRef<HTMLDivElement>(null);
   const editableRef = useRef<HTMLDivElement>(null);
   const draftContentRef = useRef<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after'>('before');
+  const isHovered = hoveredElement === element.id;
 
   const [{ isDragging }, drag, preview] = useDrag({
     type: 'element',
@@ -49,16 +50,26 @@ export function DraggableElement({
     }),
   });
 
-  const [, drop] = useDrop({
+  const [{ isOverTarget }, drop] = useDrop({
     accept: 'element',
-    hover: (item: { index: number }) => {
+    hover: (item: { index: number; dropPosition?: 'before' | 'after' }, monitor) => {
       if (!ref.current) return;
-      const dragIndex = item.index;
-      const hoverIndex = index;
-      if (dragIndex === hoverIndex) return;
-      onMove(dragIndex, hoverIndex);
-      item.index = hoverIndex;
+      const pointer = monitor.getClientOffset();
+      if (!pointer) return;
+
+      const bounds = ref.current.getBoundingClientRect();
+      const position = pointer.y < bounds.top + bounds.height / 2 ? 'before' : 'after';
+      item.dropPosition = position;
+      setDropPosition(position);
     },
+    drop: (item: { index: number; dropPosition?: 'before' | 'after' }) => {
+      if (item.index === index) return;
+      const insertionIndex = (item.dropPosition ?? dropPosition) === 'after' ? index + 1 : index;
+      onMove(item.index, insertionIndex);
+    },
+    collect: (monitor) => ({
+      isOverTarget: monitor.isOver({ shallow: true }),
+    }),
   });
 
   preview(drop(ref));
@@ -107,10 +118,16 @@ export function DraggableElement({
 
   const renderElement = () => {
     const style = {
-      padding: `${element.properties.padding || 20}px`,
-      margin: `${element.properties.margin || 10}px 0`,
+      paddingTop: `${element.properties.paddingTop ?? element.properties.padding ?? 0}px`,
+      paddingRight: `${element.properties.paddingRight ?? element.properties.padding ?? 0}px`,
+      paddingBottom: `${element.properties.paddingBottom ?? element.properties.padding ?? 0}px`,
+      paddingLeft: `${element.properties.paddingLeft ?? element.properties.padding ?? 0}px`,
+      marginTop: `${element.properties.marginTop ?? element.properties.margin ?? 0}px`,
+      marginRight: `${element.properties.marginRight ?? element.properties.margin ?? 0}px`,
+      marginBottom: `${element.properties.marginBottom ?? element.properties.margin ?? 0}px`,
+      marginLeft: `${element.properties.marginLeft ?? element.properties.margin ?? 0}px`,
       backgroundColor: element.properties.backgroundColor || 'transparent',
-      textAlign: element.properties.textAlign || 'left',
+      textAlign: element.properties.contentAlign || element.properties.textAlign || 'left',
       fontSize: `${element.properties.fontSize || 16}px`,
       color: element.properties.color || '#000000',
       borderRadius: `${element.properties.borderRadius || 0}px`,
@@ -167,19 +184,45 @@ export function DraggableElement({
 
       case 'image':
         return (
-          <div style={{ padding: `${element.properties.padding || 20}px 0` }}>
+          <div
+            style={{
+              ...style,
+              display: 'flex',
+              justifyContent:
+                (element.properties.contentAlign || element.properties.imageAlign) === 'center'
+                  ? 'center'
+                  : (element.properties.contentAlign || element.properties.imageAlign) === 'right'
+                    ? 'flex-end'
+                    : 'flex-start',
+            }}
+          >
             <ImageWithFallback
               src={element.properties.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800'}
               alt="Content"
-              className="w-full h-auto rounded-xl object-cover"
-              style={{ borderRadius: `${element.properties.borderRadius || 0}px` }}
+              className="max-w-full rounded-xl object-cover"
+              style={{
+                width: element.properties.imageWidth || '100%',
+                height: element.properties.imageHeight || 'auto',
+                borderRadius: `${element.properties.borderRadius || 0}px`,
+              }}
             />
           </div>
         );
 
       case 'calendar':
         return (
-          <div style={style} className="flex justify-center">
+          <div
+            style={{
+              ...style,
+              display: 'flex',
+              justifyContent:
+                element.properties.contentAlign === 'left'
+                  ? 'flex-start'
+                  : element.properties.contentAlign === 'right'
+                    ? 'flex-end'
+                    : 'center',
+            }}
+          >
             <Calendar
               mode="single"
               className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
@@ -212,13 +255,66 @@ export function DraggableElement({
                   parentId={element.id}
                   elements={columnElements}
                   selectedElement={selectedElement}
+                  hoveredElement={hoveredElement}
                   onSelectElement={onSelectElement}
                   onUpdate={onUpdate}
                   elementGap={element.type === 'flex' ? element.properties.columnGap : undefined}
-                  onAddToColumn={(newElement) => {
+                  onAddToColumn={(newElement, insertionIndex) => {
                     const newChildren = [...(element.children || [])];
-                    newChildren.push({ ...newElement, columnIndex: idx });
+                    const childWithColumn = { ...newElement, columnIndex: idx };
+
+                    if (insertionIndex === undefined) {
+                      newChildren.push(childWithColumn);
+                    } else {
+                      const columnChildIndexes = newChildren.reduce<number[]>(
+                        (indexes, child, childIndex) => {
+                          if ((child.columnIndex ?? 0) === idx) indexes.push(childIndex);
+                          return indexes;
+                        },
+                        []
+                      );
+                      const globalInsertionIndex =
+                        columnChildIndexes[insertionIndex]
+                        ?? (columnChildIndexes.length > 0
+                          ? columnChildIndexes[columnChildIndexes.length - 1] + 1
+                          : newChildren.length);
+                      newChildren.splice(globalInsertionIndex, 0, childWithColumn);
+                    }
+
                     onUpdate(element.id, { children: newChildren });
+                  }}
+                  onDuplicateFromColumn={(childId) => {
+                    const newChildren = [...(element.children || [])];
+                    const childIndex = newChildren.findIndex((child) => child.id === childId);
+                    if (childIndex === -1) return;
+
+                    const source = newChildren[childIndex];
+                    const duplicate = {
+                      ...source,
+                      id: `col-element-${Date.now()}-${Math.random()}`,
+                      properties: { ...source.properties },
+                    };
+                    newChildren.splice(childIndex + 1, 0, duplicate);
+                    onUpdate(element.id, { children: newChildren });
+                  }}
+                  onMoveInColumn={(dragIndex, insertionIndex) => {
+                    const newChildren = [...(element.children || [])];
+                    const columnChildren = newChildren.filter(
+                      (child) => (child.columnIndex ?? 0) === idx
+                    );
+                    const [movedChild] = columnChildren.splice(dragIndex, 1);
+                    if (!movedChild) return;
+
+                    const adjustedIndex =
+                      dragIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
+                    columnChildren.splice(adjustedIndex, 0, movedChild);
+                    let columnChildIndex = 0;
+                    const reorderedChildren = newChildren.map((child) =>
+                      (child.columnIndex ?? 0) === idx
+                        ? columnChildren[columnChildIndex++]
+                        : child
+                    );
+                    onUpdate(element.id, { children: reorderedChildren });
                   }}
                   onDeleteFromColumn={(childId) => {
                     const newChildren = (element.children || []).filter(
@@ -240,61 +336,101 @@ export function DraggableElement({
   return (
     <div
       ref={ref}
+      data-editor-element-id={element.id}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       className={`relative group transition-all ${isDragging ? 'opacity-40' : 'opacity-100'}`}
-      style={{ opacity: isDragging ? 0.4 : 1 }}
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        float:
+          element.properties.float && element.properties.float !== 'none'
+            ? element.properties.float
+            : undefined,
+        width:
+          element.properties.float && element.properties.float !== 'none'
+            ? element.properties.width || 'fit-content'
+            : undefined,
+        maxWidth: '100%',
+      }}
     >
-      {/* Hover Overlay */}
-      {(isHovered || isSelected) && !isEditing && (
-        <div className="absolute inset-0 bg-indigo-500/5 rounded-xl pointer-events-none z-[5] animate-in fade-in duration-150" />
+      {isOverTarget && !isDragging && (
+        <div
+          className={`pointer-events-none absolute left-0 right-0 z-30 h-0.5 bg-sky-500 shadow-[0_0_0_1px_rgba(255,255,255,0.9)] ${
+            dropPosition === 'before' ? '-top-px' : '-bottom-px'
+          }`}
+        >
+          <span className="absolute -left-1 -top-[3px] size-2 rounded-full border-2 border-sky-500 bg-white" />
+          <span className="absolute -right-1 -top-[3px] size-2 rounded-full border-2 border-sky-500 bg-white" />
+        </div>
       )}
 
-      {/* Drag Handle */}
-      <div
-        ref={drag}
-        className={`absolute -left-10 top-1/2 -translate-y-1/2 transition-all duration-200 ${
-          isHovered || isSelected ? 'opacity-100' : 'opacity-0'
-        } cursor-move z-20`}
-      >
-        <div className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700">
-          <GripVertical className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-        </div>
-      </div>
+      {/* Hover Overlay */}
+      {(isHovered || isSelected) && !isEditing && (
+        <div className="absolute inset-0 z-[5] pointer-events-none ring-1 ring-inset ring-indigo-500/80 animate-in fade-in duration-150" />
+      )}
 
       {/* Action Buttons */}
-      {(isHovered || isSelected) && !isEditing && (
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1 z-20 animate-in slide-in-from-top-2 duration-200">
+      {(isHovered || (isSelected && hoveredElement === null)) && !isEditing && (
+        <div className="absolute -top-6 left-1/2 z-20 flex h-6 -translate-x-1/2 items-center rounded-sm bg-indigo-600 px-1 text-white animate-in fade-in duration-150">
+          <span
+            ref={(node) => {
+              drag(node);
+            }}
+            className="flex h-full cursor-move items-center px-1.5 text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+            title="Drag element"
+          >
+            <Move className="size-3.5" />
+          </span>
+          <div className="h-3.5 w-px bg-white/25" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+            className="flex h-full items-center px-1.5 text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+            title="Settings"
+          >
+            <Settings className="size-3.5" />
+          </button>
+          <div className="h-3.5 w-px bg-white/25" />
           <button
             onClick={(e) => {
               e.stopPropagation();
               onDuplicate(element.id);
             }}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="flex h-full items-center px-1.5 text-white/85 transition-colors hover:bg-white/15 hover:text-white"
             title="Duplicate"
           >
-            <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            <Copy className="size-3.5" />
           </button>
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
+          <div className="h-3.5 w-px bg-white/25" />
           <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete(element.id);
             }}
-            className="p-2 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+            className="flex h-full items-center px-1.5 text-white/85 transition-colors hover:bg-red-500/35 hover:text-white"
             title="Delete"
           >
-            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+            <Trash2 className="size-3.5" />
           </button>
         </div>
       )}
 
       {/* Element Content */}
-      <div className={isEditing ? 'relative z-30' : ''}>
+      <div
+        className={`${isEditing ? 'relative z-30' : ''} flex min-h-full flex-col`}
+        style={{
+          justifyContent:
+            element.properties.verticalAlign === 'center'
+              ? 'center'
+              : element.properties.verticalAlign === 'bottom'
+                ? 'flex-end'
+                : 'flex-start',
+        }}
+      >
         {renderElement()}
       </div>
 

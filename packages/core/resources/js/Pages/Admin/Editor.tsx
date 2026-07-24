@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { EditorSidebar } from '@components/editor/EditorSidebar';
@@ -7,12 +7,62 @@ import { EditorToolbar } from '@components/editor/EditorToolbar';
 import { EditorProperties } from '@components/editor/EditorProperties';
 import { EditorElement } from '@components/editor/ElementTypes';
 
-export default function Editor() {
-  const [elements, setElements] = useState<EditorElement[]>([]);
+interface EditorProps {
+  page: {
+    id: number;
+    title: string;
+    elements: EditorElement[];
+    lockVersion: number;
+    updatedAt: string | null;
+  };
+}
+
+export default function Editor({ page }: EditorProps) {
+  const [elements, setElements] = useState<EditorElement[]>(page.elements);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
-  const [showProperties, setShowProperties] = useState(true);
   const [showGridModal, setShowGridModal] = useState(false);
   const [pendingGridElement, setPendingGridElement] = useState<EditorElement | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const lockVersionRef = useRef(page.lockVersion);
+  const lastSavedElementsRef = useRef(JSON.stringify(page.elements));
+
+  useEffect(() => {
+    const serializedElements = JSON.stringify(elements);
+    if (serializedElements === lastSavedElementsRef.current) return;
+
+    const timeout = window.setTimeout(async () => {
+      setSaveStatus('saving');
+
+      try {
+        const csrfToken = document
+          .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+          ?.content;
+        const response = await fetch(`/admin/pages/${page.id}/wysiwyg`, {
+          method: 'PUT',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken || '',
+          },
+          body: JSON.stringify({
+            elements,
+            lock_version: lockVersionRef.current,
+          }),
+        });
+
+        if (!response.ok) throw new Error('Unable to save page');
+
+        const result = await response.json();
+        lockVersionRef.current = result.lockVersion;
+        lastSavedElementsRef.current = serializedElements;
+        setSaveStatus('saved');
+      } catch {
+        setSaveStatus('error');
+      }
+    }, 800);
+
+    return () => window.clearTimeout(timeout);
+  }, [elements, page.id]);
 
   const hasContainerElements = elements.some(el => el.type === 'flex' || el.type === 'grid');
 
@@ -25,8 +75,8 @@ export default function Editor() {
       id: `element-${Date.now()}`,
       type: 'grid',
       properties: { 
-        padding: '20',
-        margin: '10',
+        padding: '0',
+        margin: '0',
         backgroundColor: 'transparent',
         textAlign: 'left',
         fontSize: '16',
@@ -72,11 +122,13 @@ export default function Editor() {
     }
   };
 
-  const moveElement = (dragIndex: number, hoverIndex: number) => {
-    const draggedElement = elements[dragIndex];
+  const moveElement = (dragIndex: number, insertionIndex: number) => {
     const newElements = [...elements];
-    newElements.splice(dragIndex, 1);
-    newElements.splice(hoverIndex, 0, draggedElement);
+    const [draggedElement] = newElements.splice(dragIndex, 1);
+    if (!draggedElement) return;
+
+    const adjustedIndex = dragIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
+    newElements.splice(adjustedIndex, 0, draggedElement);
     setElements(newElements);
   };
 
@@ -117,7 +169,10 @@ export default function Editor() {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
-        <EditorToolbar setShowProperties={setShowProperties} showProperties={showProperties} />
+        <EditorToolbar
+          title={page.title}
+          saveStatus={saveStatus}
+        />
         <div className="flex-1 flex overflow-hidden">
           <EditorSidebar onAddElement={addElement} showGridModal={() => setShowGridModal(true)} hasContainerElements={hasContainerElements} />
           <EditorCanvas
@@ -131,12 +186,10 @@ export default function Editor() {
             addElement={addElement}
             hasContainerElements={hasContainerElements}
           />
-          {showProperties && selectedElementData && (
-            <EditorProperties
-              element={selectedElementData}
-              updateElement={updateElement}
-            />
-          )}
+          <EditorProperties
+            element={selectedElementData}
+            updateElement={updateElement}
+          />
         </div>
       </div>
 

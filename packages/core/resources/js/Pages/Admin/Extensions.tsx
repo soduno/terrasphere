@@ -103,7 +103,7 @@ export default function Extensions() {
                     Installed
                   </Button>
                 ) : (
-                  <Button size="sm" className="gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700">
+                  <Button size="sm" className="gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300">
                     <Download className="w-4 h-4" />
                     Install
                   </Button>

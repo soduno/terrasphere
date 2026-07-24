@@ -89,7 +89,7 @@ export function Content() {
         </div>
         <Button
           onClick={() => setShowNewPageModal(true)}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 shadow-md shadow-indigo-500/20"
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20"
         >
           <Plus className="w-4 h-4" />
           New Page
@@ -139,7 +139,19 @@ export function Content() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredPages.map((page) => (
-                <tr key={page.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                <tr
+                  key={page.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => handleEdit(page)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleEdit(page);
+                    }
+                  }}
+                  className="cursor-pointer transition-colors hover:bg-indigo-50/40 focus:bg-indigo-50/40 focus:outline-none dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5"
+                >
                   <td className="px-6 py-5">
                     <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
                   </td>
@@ -168,7 +180,11 @@ export function Content() {
                   <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">{page.author}</td>
                   <td className="px-6 py-5 text-sm text-gray-500 dark:text-gray-400">{page.date}</td>
                   <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">{page.views}</td>
-                  <td className="px-6 py-5">
+                  <td
+                    className="px-6 py-5"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 dark:hover:bg-gray-800">

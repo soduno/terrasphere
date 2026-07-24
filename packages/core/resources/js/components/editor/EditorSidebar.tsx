@@ -99,11 +99,19 @@ export function EditorSidebar({ onAddElement, showGridModal, hasContainerElement
           ...baseElement,
           properties: { 
             ...baseElement.properties, 
-            imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800'
+            imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
+            imageWidth: '100%',
+            imageHeight: 'auto',
           },
         };
       case 'calendar':
-        return baseElement;
+        return {
+          ...baseElement,
+          properties: {
+            ...baseElement.properties,
+            contentAlign: 'center',
+          },
+        };
       case 'flex':
         return {
           ...baseElement,
@@ -111,7 +119,7 @@ export function EditorSidebar({ onAddElement, showGridModal, hasContainerElement
           properties: {
             ...baseElement.properties,
             width: '100%',
-            padding: '8',
+            padding: '0',
             columnCount: 1,
           },
         };

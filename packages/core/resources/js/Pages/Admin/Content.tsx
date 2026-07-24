@@ -11,55 +11,19 @@ import {
 } from '@ui/dropdown-menu';
 import { NewPageModal } from './NewPageModal';
 
-const pages = [
-  {
-    id: 1,
-    title: 'Homepage Redesign',
-    status: 'Published',
-    author: 'John Doe',
-    date: 'Nov 18, 2025',
-    views: 1234,
-    type: 'visual',
-  },
-  {
-    id: 2,
-    title: 'About Us',
-    status: 'Draft',
-    author: 'Jane Smith',
-    date: 'Nov 19, 2025',
-    views: 856,
-    type: 'visual',
-  },
-  {
-    id: 3,
-    title: 'Product Launch',
-    status: 'Published',
-    author: 'John Doe',
-    date: 'Nov 17, 2025',
-    views: 2341,
-    type: 'fields',
-  },
-  {
-    id: 4,
-    title: 'Services Overview',
-    status: 'Published',
-    author: 'Alice Johnson',
-    date: 'Nov 16, 2025',
-    views: 1456,
-    type: 'visual',
-  },
-  {
-    id: 5,
-    title: 'Contact Page',
-    status: 'Draft',
-    author: 'Jane Smith',
-    date: 'Nov 20, 2025',
-    views: 234,
-    type: 'fields',
-  },
-];
+interface PageSummary {
+  id: number;
+  title: string;
+  status: 'draft' | 'published' | 'archived';
+  type: 'wysiwyg' | 'custom_fields';
+  updatedAt: string | null;
+}
 
-export default function Content() {
+interface ContentProps {
+  pages: PageSummary[];
+}
+
+export default function Content({ pages }: ContentProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewPageModal, setShowNewPageModal] = useState(false);
 
@@ -67,16 +31,16 @@ export default function Content() {
     page.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleEdit = (page: typeof pages[0]) => {
-    if (page.type === 'visual') {
+  const handleEdit = (page: PageSummary) => {
+    if (page.type === 'wysiwyg') {
       router.visit(`/admin/editor/${page.id}`);
     } else {
       router.visit(`/admin/fields-editor/${page.id}`);
     }
   };
 
-  const handleEditFields = (page: typeof pages[0]) => {
-    router.visit(`/admin/fields-builder?page=${page.id}`);
+  const handleEditFields = (page: PageSummary) => {
+    router.visit(`/admin/fields-builder/${page.id}`);
   };
 
   return (
@@ -88,7 +52,7 @@ export default function Content() {
         </div>
         <Button
           onClick={() => setShowNewPageModal(true)}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 shadow-md shadow-indigo-500/20"
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20"
         >
           <Plus className="w-4 h-4" />
           New Page
@@ -138,36 +102,54 @@ export default function Content() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredPages.map((page) => (
-                <tr key={page.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                <tr
+                  key={page.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => handleEdit(page)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleEdit(page);
+                    }
+                  }}
+                  className="cursor-pointer transition-colors hover:bg-indigo-50/40 focus:bg-indigo-50/40 focus:outline-none dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5"
+                >
                   <td className="px-6 py-5">
                     <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
                   </td>
                   <td className="px-6 py-5">
                     <span
                       className={`px-3 py-1.5 text-xs rounded-full ${
-                        page.type === 'visual'
+                        page.type === 'wysiwyg'
                           ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400'
                           : 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400'
                       }`}
                     >
-                      {page.type === 'visual' ? 'Visual' : 'Custom Fields'}
+                      {page.type === 'wysiwyg' ? 'WYSIWYG' : 'Custom Fields'}
                     </span>
                   </td>
                   <td className="px-6 py-5">
                     <span
                       className={`px-3 py-1.5 text-xs rounded-full ${
-                        page.status === 'Published'
+                        page.status === 'published'
                           ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
                       }`}
                     >
-                      {page.status}
+                      {page.status.charAt(0).toUpperCase() + page.status.slice(1)}
                     </span>
                   </td>
-                  <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">{page.author}</td>
-                  <td className="px-6 py-5 text-sm text-gray-500 dark:text-gray-400">{page.date}</td>
-                  <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">{page.views}</td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">—</td>
+                  <td className="px-6 py-5 text-sm text-gray-500 dark:text-gray-400">
+                    {page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">—</td>
+                  <td
+                    className="px-6 py-5"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 dark:hover:bg-gray-800">
@@ -179,7 +161,7 @@ export default function Content() {
                           <Edit className="w-4 h-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        {page.type === 'fields' && (
+                        {page.type === 'custom_fields' && (
                           <DropdownMenuItem onClick={() => handleEditFields(page)} className="dark:hover:bg-gray-700">
                             <Settings2 className="w-4 h-4 mr-2" />
                             Edit Fields

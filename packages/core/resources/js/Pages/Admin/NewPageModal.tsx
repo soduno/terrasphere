@@ -1,7 +1,6 @@
 import { router } from '@inertiajs/react';
-import { Layout, FileEdit, X } from 'lucide-react';
+import { Layout, FileEdit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@ui/dialog';
-import { Button } from '@ui/button';
 
 interface NewPageModalProps {
   open: boolean;
@@ -9,13 +8,10 @@ interface NewPageModalProps {
 }
 
 export function NewPageModal({ open, onClose }: NewPageModalProps) {
-  const handleSelectType = (type: 'visual' | 'fields') => {
-    if (type === 'visual') {
-      router.visit('/admin/editor');
-    } else {
-      router.visit('/admin/fields-builder');
-    }
-    onClose();
+  const handleSelectType = (contentType: 'wysiwyg' | 'custom_fields') => {
+    router.post('/admin/pages', { content_type: contentType }, {
+      onSuccess: onClose,
+    });
   };
 
   return (
@@ -31,7 +27,7 @@ export function NewPageModal({ open, onClose }: NewPageModalProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           {/* Visual Editor Option */}
           <button
-            onClick={() => handleSelectType('visual')}
+            onClick={() => handleSelectType('wysiwyg')}
             className="group relative p-8 border-2 border-gray-200 dark:border-gray-700 rounded-2xl hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-lg"
           >
             <div className="flex flex-col items-center text-center">
@@ -52,7 +48,7 @@ export function NewPageModal({ open, onClose }: NewPageModalProps) {
 
           {/* Custom Fields Option */}
           <button
-            onClick={() => handleSelectType('fields')}
+            onClick={() => handleSelectType('custom_fields')}
             className="group relative p-8 border-2 border-gray-200 dark:border-gray-700 rounded-2xl hover:border-purple-500 dark:hover:border-purple-500 transition-all hover:shadow-lg"
           >
             <div className="flex flex-col items-center text-center">

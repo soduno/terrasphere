@@ -15,6 +15,11 @@ interface EditorCanvasProps {
   hasContainerElements: boolean;
 }
 
+interface NewCanvasElementItem {
+  createElement: () => EditorElement;
+  isLayout?: boolean;
+}
+
 export function EditorCanvas({
   elements,
   selectedElement,
@@ -27,10 +32,15 @@ export function EditorCanvas({
   hasContainerElements,
 }: EditorCanvasProps) {
   const [justDropped, setJustDropped] = useState(false);
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
   
-  const [{ isOver, canDrop, draggedItem }, drop] = useDrop({
+  const [{ isOver, canDrop }, drop] = useDrop<
+    NewCanvasElementItem,
+    void,
+    { isOver: boolean; canDrop: boolean }
+  >({
     accept: 'new-element',
-    drop: (item: { createElement: () => EditorElement; isLayout?: boolean }, monitor) => {
+    drop: (item, monitor) => {
       // Only add to main canvas if not already handled by a nested drop zone
       const didDrop = monitor.didDrop();
       if (!didDrop) {
@@ -46,14 +56,13 @@ export function EditorCanvas({
         setTimeout(() => setJustDropped(false), 600);
       }
     },
-    canDrop: (item: { isLayout?: boolean }) => {
+    canDrop: (item) => {
       // Only allow layout elements on the main canvas
       return !!item.isLayout;
     },
     collect: (monitor) => ({
       isOver: monitor.isOver({ shallow: true }),
       canDrop: monitor.canDrop(),
-      draggedItem: monitor.getItem(),
     }),
   });
 
@@ -61,8 +70,18 @@ export function EditorCanvas({
 
   return (
     <div 
-      ref={drop}
+      ref={(node) => {
+        drop(node);
+      }}
       onClick={() => setSelectedElement(null)}
+      onMouseOver={(e) => {
+        const target = e.target;
+        const elementRoot = target instanceof Element
+          ? target.closest<HTMLElement>('[data-editor-element-id]')
+          : null;
+        setHoveredElement(elementRoot?.dataset.editorElementId ?? null);
+      }}
+      onMouseLeave={() => setHoveredElement(null)}
       className={`flex-1 overflow-auto bg-white p-12 transition-all relative ${
         isOver && canDrop
           ? 'bg-indigo-500/5' 
@@ -130,7 +149,7 @@ export function EditorCanvas({
           )}
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="flow-root space-y-1">
           {elements.map((element, index) => {
             const isContainer = element.type === 'flex' || element.type === 'grid';
             const shouldBlur = !hasContainerElements || isContainer;
@@ -146,6 +165,7 @@ export function EditorCanvas({
                   element={element}
                   index={index}
                   isSelected={selectedElement === element.id}
+                  hoveredElement={hoveredElement}
                   onSelect={() => setSelectedElement(element.id)}
                   selectedElement={selectedElement}
                   onSelectElement={setSelectedElement}

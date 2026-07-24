@@ -95,7 +95,7 @@ export function Profile() {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 shadow-md shadow-indigo-500/20">
+          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20">
             <Save className="w-4 h-4" />
             Save Changes
           </Button>

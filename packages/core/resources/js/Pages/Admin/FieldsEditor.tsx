@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { ArrowLeft, Save, Settings, Plus, Trash2, Upload } from 'lucide-react';
 import { Button } from '@ui/button';
@@ -26,34 +26,17 @@ interface FieldRow {
   fields: CustomField[];
 }
 
-interface PageConfig {
-  name: string;
-  rows: FieldRow[];
-  type: string;
-}
-
 interface FieldsEditorProps {
-  id: string;
+  page: {
+    id: number;
+    title: string;
+    rows: FieldRow[];
+    values: Record<string, any>;
+  };
 }
 
-export default function FieldsEditor({ id }: FieldsEditorProps) {
-  const [pageConfig, setPageConfig] = useState<PageConfig | null>(null);
-  const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
-
-  useEffect(() => {
-    if (id) {
-      const saved = localStorage.getItem(`page-${id}`);
-      if (saved) {
-        const config = JSON.parse(saved);
-        setPageConfig(config);
-
-        const savedValues = localStorage.getItem(`page-${id}-values`);
-        if (savedValues) {
-          setFieldValues(JSON.parse(savedValues));
-        }
-      }
-    }
-  }, [id]);
+export default function FieldsEditor({ page }: FieldsEditorProps) {
+  const [fieldValues, setFieldValues] = useState<Record<string, any>>(page.values);
 
   const handleFieldChange = (fieldName: string, value: any) => {
     setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
@@ -113,23 +96,14 @@ export default function FieldsEditor({ id }: FieldsEditorProps) {
   };
 
   const handleSave = () => {
-    if (id) {
-      localStorage.setItem(`page-${id}-values`, JSON.stringify(fieldValues));
-      router.visit('/admin/content');
-    }
+    router.put(`/admin/pages/${page.id}/field-values`, {
+      values: fieldValues,
+    });
   };
 
   const handleEditFields = () => {
-    router.visit(`/admin/fields-builder?page=${id}`);
+    router.visit(`/admin/fields-builder/${page.id}`);
   };
-
-  if (!pageConfig) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-      </div>
-    );
-  }
 
   const renderField = (field: CustomField) => {
     switch (field.type) {
@@ -376,7 +350,7 @@ export default function FieldsEditor({ id }: FieldsEditorProps) {
               Back
             </Button>
             <div>
-              <h1 className="text-gray-900 dark:text-white mb-1">{pageConfig.name}</h1>
+              <h1 className="text-gray-900 dark:text-white mb-1">{page.title}</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Fill in the custom fields
               </p>
@@ -394,7 +368,7 @@ export default function FieldsEditor({ id }: FieldsEditorProps) {
             </Button>
             <Button
               onClick={handleSave}
-              className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 shadow-md shadow-indigo-500/20"
+              className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20"
             >
               <Save className="w-4 h-4" />
               Save
@@ -403,7 +377,7 @@ export default function FieldsEditor({ id }: FieldsEditorProps) {
         </div>
 
         <div className="space-y-6">
-          {pageConfig.rows.map((row) => (
+          {page.rows.map((row) => (
             <Card
               key={row.id}
               className="border-0 dark:border dark:border-gray-800 shadow-sm dark:bg-gray-900"
