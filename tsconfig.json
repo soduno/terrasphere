@@ -9,7 +9,9 @@
             "@components": ["./packages/core/resources/js/components"],
             "@components/*": ["./packages/core/resources/js/components/*"],
             "@ui": ["./packages/core/resources/js/components/ui"],
-            "@ui/*": ["./packages/core/resources/js/components/ui/*"]
+            "@ui/*": ["./packages/core/resources/js/components/ui/*"],
+            "@media": ["./packages/media/resources/js"],
+            "@media/*": ["./packages/media/resources/js/*"]
         },
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,

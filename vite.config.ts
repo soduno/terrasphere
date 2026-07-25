@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
                 '@ui': fileURLToPath(
                     new URL('./packages/core/resources/js/components/ui', import.meta.url),
                 ),
+                '@media': fileURLToPath(
+                    new URL('./packages/media/resources/js', import.meta.url),
+                ),
             },
         },
         plugins: [

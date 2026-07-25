@@ -170,4 +170,28 @@ final class PageController
 
         return redirect()->route('terrasphere.admin.content');
     }
+
+    public function updateTitle(Request $request, Page $page): RedirectResponse
+    {
+        abort_unless($page->content_type === 'custom_fields', 404);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+        ]);
+
+        $page->update([
+            'title' => $validated['title'],
+        ]);
+
+        return redirect()->back()->with('success', 'Page title updated.');
+    }
+
+    public function destroy(Page $page): RedirectResponse
+    {
+        $page->delete();
+
+        return redirect()
+            ->route('terrasphere.admin.content')
+            ->with('success', 'Page deleted.');
+    }
 }

@@ -1,8 +1,27 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { Plus, Search, MoreVertical, Edit, Trash2, Copy, Settings2 } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Copy,
+  Settings2,
+  LoaderCircle,
+} from 'lucide-react';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +45,10 @@ interface ContentProps {
 export default function Content({ pages }: ContentProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewPageModal, setShowNewPageModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PageSummary | null>(null);
+  const [deletingPageId, setDeletingPageId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const filteredPages = pages.filter((page) =>
     page.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -41,6 +64,35 @@ export default function Content({ pages }: ContentProps) {
 
   const handleEditFields = (page: PageSummary) => {
     router.visit(`/admin/fields-builder/${page.id}`);
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget || isDeleting) {
+      return;
+    }
+
+    const page = deleteTarget;
+
+    setDeleteError(null);
+    setDeleteTarget(null);
+    setDeletingPageId(page.id);
+    setIsDeleting(true);
+
+    window.setTimeout(() => {
+      router.delete(`/admin/pages/${page.id}`, {
+        preserveScroll: true,
+        onError: (errors) => {
+          const message = Object.values(errors)[0];
+
+          setDeleteError(typeof message === 'string' ? message : 'The page could not be deleted.');
+          setDeleteTarget(page);
+        },
+        onFinish: () => {
+          setDeletingPageId(null);
+          setIsDeleting(false);
+        },
+      });
+    }, 450);
   };
 
   return (
@@ -113,7 +165,11 @@ export default function Content({ pages }: ContentProps) {
                       handleEdit(page);
                     }
                   }}
-                  className="cursor-pointer transition-colors hover:bg-indigo-50/40 focus:bg-indigo-50/40 focus:outline-none dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5"
+                  className={`cursor-pointer transition-[background-color,opacity] duration-200 focus:outline-none ${
+                    deletingPageId === page.id
+                      ? 'animate-pulse bg-red-100/80 opacity-40 dark:bg-red-950/60'
+                      : 'hover:bg-indigo-50/40 focus:bg-indigo-50/40 dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5'
+                  }`}
                 >
                   <td className="px-6 py-5">
                     <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
@@ -171,7 +227,15 @@ export default function Content({ pages }: ContentProps) {
                           <Copy className="w-4 h-4 mr-2" />
                           Duplicate
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 dark:text-red-400 dark:hover:bg-gray-700">
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={isDeleting}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteTarget(page);
+                          }}
+                          className="dark:hover:bg-red-950/50"
+                        >
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
@@ -184,6 +248,42 @@ export default function Content({ pages }: ContentProps) {
           </table>
         </div>
       </div>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{deleteTarget?.title}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the page and its content. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
+              Delete page
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <NewPageModal open={showNewPageModal} onClose={() => setShowNewPageModal(false)} />
     </div>

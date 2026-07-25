@@ -7,6 +7,7 @@ use TerraSphere\Core\Http\Middleware\HandleAdminInertiaRequests;
 use TerraSphere\Core\Http\Middleware\RequireAdminAuthentication;
 use TerraSphere\Media\Http\Controllers\Admin\MediaController;
 use TerraSphere\Media\Http\Controllers\Admin\MediaDeleteController;
+use TerraSphere\Media\Http\Controllers\Admin\MediaPickerController;
 use TerraSphere\Media\Http\Controllers\Admin\MediaUploadController;
 use TerraSphere\Media\Http\Controllers\MediaFileController;
 
@@ -23,6 +24,7 @@ Route::middleware([
     ->name('terrasphere.admin.media.')
     ->group(function (): void {
         Route::get('/media', MediaController::class)->name('index');
+        Route::get('/media-picker', MediaPickerController::class)->name('picker');
         Route::post('/media', MediaUploadController::class)->name('store');
         Route::delete('/media/{asset}', MediaDeleteController::class)->name('destroy');
     });

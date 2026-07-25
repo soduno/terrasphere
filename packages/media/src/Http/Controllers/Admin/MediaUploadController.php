@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TerraSphere\Media\Http\Controllers\Admin;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ use Throwable;
 
 final class MediaUploadController
 {
-    public function __invoke(Request $request): RedirectResponse
+    public function __invoke(Request $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'images' => ['required', 'array', 'min:1', 'max:20'],
@@ -29,6 +30,7 @@ final class MediaUploadController
 
         $disk = 'local';
         $storedPaths = [];
+        $assets = [];
 
         DB::beginTransaction();
 
@@ -55,7 +57,7 @@ final class MediaUploadController
                 $filename = basename(str_replace('\\', '/', $image->getClientOriginalName()));
                 $filename = preg_replace('/[[:cntrl:]]/u', '', $filename) ?: "image.$extension";
 
-                MediaAsset::query()->create([
+                $asset = MediaAsset::query()->create([
                     'uuid' => $uuid,
                     'disk' => $disk,
                     'path' => $path,
@@ -66,6 +68,18 @@ final class MediaUploadController
                     'height' => is_array($dimensions) ? $dimensions[1] : null,
                     'uploaded_by' => $request->user()?->getAuthIdentifier(),
                 ]);
+
+                $assets[] = [
+                    'id' => (int) $asset->getKey(),
+                    'url' => route('terrasphere.media.file', [
+                        'asset' => $asset->uuid,
+                        'filename' => $asset->filename,
+                    ], false),
+                    'name' => $asset->filename,
+                    'width' => $asset->width,
+                    'height' => $asset->height,
+                    'size' => $asset->size,
+                ];
             }
 
             DB::commit();
@@ -77,6 +91,10 @@ final class MediaUploadController
             }
 
             throw $exception;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['images' => $assets], 201);
         }
 
         return back()->with('success', count($storedPaths).' image(s) uploaded.');
