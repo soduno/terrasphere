@@ -59,7 +59,11 @@ interface FieldsBuilderProps {
   page: {
     id: number;
     title: string;
+    slug: string;
     rows: FieldRow[];
+  };
+  errors?: {
+    slug?: string;
   };
 }
 
@@ -108,10 +112,19 @@ const fieldTypes = [
   },
 ];
 
-export default function FieldsBuilder({ page }: FieldsBuilderProps) {
+const normalizeSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-');
+
+export default function FieldsBuilder({ page, errors = {} }: FieldsBuilderProps) {
   const [pageName, setPageName] = useState(page.title);
+  const [modelSlug, setModelSlug] = useState(page.slug);
   const [rows, setRows] = useState<FieldRow[]>(page.rows);
   const [fieldPickerRowId, setFieldPickerRowId] = useState<string | null>(null);
+  const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
 
   const addRow = (columns: '1' | '2') => {
     const newRow: FieldRow = {
@@ -144,6 +157,7 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
       )
     );
     setFieldPickerRowId(null);
+    setExpandedFieldId(newField.id);
   };
 
   const updateField = (rowId: string, fieldId: string, updates: Partial<CustomField>) => {
@@ -168,6 +182,9 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
           ? { ...row, fields: row.fields.filter((field) => field.id !== fieldId) }
           : row
       )
+    );
+    setExpandedFieldId((currentFieldId) =>
+      currentFieldId === fieldId ? null : currentFieldId
     );
   };
 
@@ -249,6 +266,7 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
   const handleSave = () => {
     router.put(`/admin/pages/${page.id}/field-schema`, {
       title: pageName,
+      slug: modelSlug,
       rows: rows as any,
     });
   };
@@ -271,20 +289,22 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
             </Button>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-purple-700 dark:bg-purple-500/10 dark:text-purple-300">
-                  Custom fields
+                <h1 className="truncate text-lg font-semibold text-gray-950 dark:text-white">
+                  Field structure
+                </h1>
+                <span className="hidden rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-purple-700 dark:bg-purple-500/10 dark:text-purple-300 sm:inline-flex">
+                  {pageName || 'Untitled model'}
                 </span>
-                <span className="text-xs text-gray-400">Draft</span>
               </div>
-              <h1 className="mt-1 truncate text-lg font-semibold text-gray-950 dark:text-white">
-                {pageName || 'Untitled content model'}
-              </h1>
+              <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                Build the form editors will use to create this content.
+              </p>
             </div>
           </div>
 
           <Button
             onClick={handleSave}
-            disabled={!pageName || totalFields === 0}
+            disabled={!pageName || !modelSlug || totalFields === 0}
             className="h-10 gap-2 rounded-xl bg-indigo-600 px-5 text-white shadow-sm shadow-indigo-500/20 hover:bg-indigo-700 dark:bg-indigo-600 dark:text-blue-300 dark:hover:bg-indigo-700"
           >
             <Save className="h-4 w-4" />
@@ -316,6 +336,29 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
               onChange={(event) => setPageName(event.target.value)}
               className="h-10 rounded-xl border-gray-200 bg-gray-50/70 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
+
+            <Label htmlFor="modelSlug" className="mb-2 mt-4 block text-xs font-medium text-gray-600 dark:text-gray-300">
+              Model slug
+            </Label>
+            <Input
+              id="modelSlug"
+              placeholder="blog-post"
+              value={modelSlug}
+              onChange={(event) => setModelSlug(normalizeSlug(event.target.value))}
+              onBlur={() => setModelSlug((slug) => slug.replace(/^-+|-+$/g, ''))}
+              aria-invalid={Boolean(errors.slug)}
+              aria-describedby={errors.slug ? 'modelSlugError' : 'modelSlugHelp'}
+              className="h-10 rounded-xl border-gray-200 bg-gray-50/70 font-mono text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+            {errors.slug ? (
+              <p id="modelSlugError" className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                {errors.slug}
+              </p>
+            ) : (
+              <p id="modelSlugHelp" className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Unique identifier using lowercase letters, numbers, and hyphens.
+              </p>
+            )}
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
@@ -366,15 +409,6 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
         </aside>
 
         <section className="min-w-0">
-          <div className="mb-5 flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-950 dark:text-white">Field structure</h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Build the form editors will use to create this content.
-              </p>
-            </div>
-          </div>
-
           {rows.length === 0 ? (
             <EmptyBuilder onAddRow={addRow} />
           ) : (
@@ -399,32 +433,39 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
-                        <button
-                          type="button"
-                          onClick={() => updateRowColumns(row.id, '1')}
-                          className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition ${
-                            row.columns === '1'
-                              ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
-                              : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
-                          }`}
-                        >
-                          <Columns2 className="h-3.5 w-3.5" />
-                          One
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateRowColumns(row.id, '2')}
-                          className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition ${
-                            row.columns === '2'
-                              ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
-                              : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
-                          }`}
-                        >
-                          <Columns3 className="h-3.5 w-3.5" />
-                          Two
-                        </button>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-gray-400 sm:inline">
+                          Section layout
+                        </span>
+                        <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                          <button
+                            type="button"
+                            onClick={() => updateRowColumns(row.id, '1')}
+                            aria-label="Use one column in this section"
+                            className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition ${
+                              row.columns === '1'
+                                ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
+                                : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                            }`}
+                          >
+                            <Columns2 className="h-3.5 w-3.5" />
+                            1 column
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateRowColumns(row.id, '2')}
+                            aria-label="Use two columns in this section"
+                            className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition ${
+                              row.columns === '2'
+                                ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
+                                : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                            }`}
+                          >
+                            <Columns3 className="h-3.5 w-3.5" />
+                            2 columns
+                          </button>
+                        </div>
                       </div>
                       <Button
                         variant="ghost"
@@ -438,42 +479,49 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
                     </div>
                   </div>
 
-                  <div className="p-5">
-                    {row.fields.length > 0 && (
-                      <div className={`grid gap-4 ${
-                        row.columns === '2' ? 'md:grid-cols-2' : 'grid-cols-1'
-                      }`}>
-                        {row.fields.map((field) => (
-                          <FieldConfigurator
-                            key={field.id}
-                            field={field}
-                            rowId={row.id}
-                            onUpdate={updateField}
-                            onDelete={deleteField}
-                            onAddOption={addOptionToField}
-                            onUpdateOption={updateOption}
-                            onRemoveOption={removeOption}
-                          />
-                        ))}
-                      </div>
-                    )}
+                  <div className="bg-gray-50/70 p-4 dark:bg-gray-950/30">
+                    <div className={`grid items-start gap-3 ${
+                      row.columns === '2' ? 'md:grid-cols-2' : 'grid-cols-1'
+                    }`}>
+                      {row.fields.map((field, fieldIndex) => (
+                        <FieldConfigurator
+                          key={field.id}
+                          field={field}
+                          fieldIndex={fieldIndex}
+                          rowId={row.id}
+                          expanded={expandedFieldId === field.id}
+                          onToggle={() =>
+                            setExpandedFieldId((currentFieldId) =>
+                              currentFieldId === field.id ? null : field.id
+                            )
+                          }
+                          onUpdate={updateField}
+                          onDelete={deleteField}
+                          onAddOption={addOptionToField}
+                          onUpdateOption={updateOption}
+                          onRemoveOption={removeOption}
+                        />
+                      ))}
 
-                    {fieldPickerRowId === row.id ? (
+                      {fieldPickerRowId !== row.id && (
+                        <button
+                          type="button"
+                          onClick={() => setFieldPickerRowId(row.id)}
+                          className="flex min-h-[66px] w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-indigo-300 bg-white/70 px-4 py-3 text-sm font-medium text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-gray-900/60 dark:text-indigo-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-500/10"
+                        >
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-500/10">
+                            <Plus className="h-4 w-4" />
+                          </span>
+                          Add field
+                        </button>
+                      )}
+                    </div>
+
+                    {fieldPickerRowId === row.id && (
                       <FieldTypePicker
                         onSelect={(type) => addFieldToRow(row.id, type)}
                         onClose={() => setFieldPickerRowId(null)}
                       />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setFieldPickerRowId(row.id)}
-                        className={`flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 py-3 text-sm font-medium text-gray-500 transition hover:border-indigo-400 hover:bg-indigo-50/40 hover:text-indigo-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-600 dark:hover:bg-indigo-500/5 dark:hover:text-indigo-300 ${
-                          row.fields.length > 0 ? 'mt-4' : ''
-                        }`}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add a field
-                      </button>
                     )}
                   </div>
                 </section>
@@ -482,10 +530,10 @@ export default function FieldsBuilder({ page }: FieldsBuilderProps) {
               <button
                 type="button"
                 onClick={() => addRow('1')}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 py-4 text-sm font-medium text-gray-500 transition hover:border-indigo-400 hover:bg-white hover:text-indigo-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-600 dark:hover:bg-gray-900 dark:hover:text-indigo-300"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 bg-transparent py-4 text-sm font-medium text-gray-500 transition hover:border-indigo-400 hover:bg-white hover:text-indigo-600 dark:border-gray-800 dark:text-gray-400 dark:hover:border-indigo-700 dark:hover:bg-gray-900 dark:hover:text-indigo-300"
               >
                 <Plus className="h-4 w-4" />
-                Add another section
+                New section
               </button>
             </div>
           )}
@@ -584,7 +632,10 @@ function FieldTypePicker({
 
 interface FieldConfiguratorProps {
   field: CustomField;
+  fieldIndex: number;
   rowId: string;
+  expanded: boolean;
+  onToggle: () => void;
   onUpdate: (rowId: string, fieldId: string, updates: Partial<CustomField>) => void;
   onDelete: (rowId: string, fieldId: string) => void;
   onAddOption: (rowId: string, fieldId: string) => void;
@@ -594,34 +645,44 @@ interface FieldConfiguratorProps {
 
 function FieldConfigurator({
   field,
+  fieldIndex,
   rowId,
+  expanded,
+  onToggle,
   onUpdate,
   onDelete,
   onAddOption,
   onUpdateOption,
   onRemoveOption,
 }: FieldConfiguratorProps) {
-  const [expanded, setExpanded] = useState(true);
   const fieldType = fieldTypes.find((item) => item.type === field.type) || fieldTypes[0];
   const Icon = fieldType.icon;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50/50 transition hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:border-gray-600">
+    <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600">
       <button
         type="button"
-        onClick={() => setExpanded((isExpanded) => !isExpanded)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-100/70 dark:hover:bg-gray-800/70"
       >
         <span className="flex min-w-0 items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm dark:bg-gray-800 dark:text-indigo-300">
             <Icon className="h-4 w-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-gray-950 dark:text-white">
-              {field.label || 'Untitled field'}
+            <span className="flex items-center gap-2">
+              <span className="truncate text-sm font-semibold text-gray-950 dark:text-white">
+                {field.label || 'Untitled field'}
+              </span>
+              {field.required && (
+                <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                  Required
+                </span>
+              )}
             </span>
             <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-              {fieldType.label} · {field.name}
+              Field {fieldIndex + 1} · {fieldType.label} · API: {field.name}
             </span>
           </span>
         </span>
@@ -631,7 +692,7 @@ function FieldConfigurator({
       </button>
 
       {expanded && (
-        <div className="border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="border-t border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label className="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-300">

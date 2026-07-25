@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -108,6 +109,7 @@ final class PageController
             'page' => [
                 'id' => $page->id,
                 'title' => $page->title,
+                'slug' => $page->slug,
                 'rows' => $page->field_schema ?? [],
             ],
         ]);
@@ -119,11 +121,19 @@ final class PageController
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
+            'slug' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                Rule::unique('pages', 'slug')->ignore($page),
+            ],
             'rows' => ['required', 'array'],
         ]);
 
         $page->update([
             'title' => $validated['title'],
+            'slug' => $validated['slug'],
             'field_schema' => $validated['rows'],
             'lock_version' => $page->lock_version + 1,
         ]);
