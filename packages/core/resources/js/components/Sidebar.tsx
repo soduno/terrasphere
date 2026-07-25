@@ -1,18 +1,43 @@
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutDashboard, FileText, Settings, Puzzle, User, Layers, LogOut, Moon, Sun } from 'lucide-react';
+import {
+  FileText,
+  Image,
+  Layers,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  Puzzle,
+  Settings,
+  Sun,
+  User,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 
-const navigation = [
-  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { name: 'Content', href: '/admin/content', icon: FileText },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
-  { name: 'Extensions', href: '/admin/extensions', icon: Puzzle },
-  { name: 'Profile', href: '/admin/profile', icon: User },
-];
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: string;
+}
+
+interface SidebarPageProps {
+  [key: string]: unknown;
+  adminNavigation?: NavigationItem[];
+}
+
+const icons: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  content: FileText,
+  media: Image,
+  settings: Settings,
+  extensions: Puzzle,
+  profile: User,
+};
 
 export function Sidebar() {
   const { theme, toggleTheme } = useTheme();
-  const { url } = usePage();
+  const { url, props } = usePage<SidebarPageProps>();
+  const navigation = props.adminNavigation ?? [];
 
   return (
     <aside className="w-[300px] bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col shadow-sm">
@@ -29,21 +54,25 @@ export function Sidebar() {
       
       <nav className="flex-1 p-6">
         <ul className="space-y-2">
-          {navigation.map((item) => (
-            <li key={item.name}>
-              <Link
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    url.split('?')[0] === item.href
-                      ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
-                  }`}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="text-sm">{item.name}</span>
-              </Link>
-            </li>
-          ))}
+          {navigation.map((item) => {
+            const Icon = icons[item.icon] ?? FileText;
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      url.split('?')[0] === item.href
+                        ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-sm">{item.name}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 

@@ -6,6 +6,7 @@ namespace TerraSphere\Core\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use TerraSphere\Core\Admin\AdminNavigation;
 
 final class HandleAdminInertiaRequests extends Middleware
 {
@@ -18,6 +19,7 @@ final class HandleAdminInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->only(['uuid', 'username', 'email']),
             ],
+            'adminNavigation' => fn (): array => app(AdminNavigation::class)->all(),
         ];
     }
 }

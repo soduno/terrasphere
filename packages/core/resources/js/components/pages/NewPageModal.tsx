@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Layout, FileEdit, X } from 'lucide-react';
+import { Layout, FileEdit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Button } from '../ui/button';
 
 interface NewPageModalProps {
   open: boolean;

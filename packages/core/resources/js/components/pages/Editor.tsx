@@ -15,8 +15,6 @@ export function Editor() {
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [showGridModal, setShowGridModal] = useState(false);
-  const [pendingGridElement, setPendingGridElement] = useState<EditorElement | null>(null);
-
   const hasContainerElements = elements.some(el => el.type === 'flex' || el.type === 'grid');
 
   const addElement = (element: EditorElement) => {

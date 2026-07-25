@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TerraSphere\Core;
 
 use Illuminate\Support\ServiceProvider;
+use TerraSphere\Core\Admin\AdminNavigation;
 use TerraSphere\Core\Console\CreateAdminUserCommand;
 use TerraSphere\Core\Models\User;
 
@@ -14,6 +15,7 @@ final class CoreServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/auth.php', 'auth');
         $this->app['config']->set('auth.providers.users.model', User::class);
+        $this->app->singleton(AdminNavigation::class);
     }
 
     public function boot(): void

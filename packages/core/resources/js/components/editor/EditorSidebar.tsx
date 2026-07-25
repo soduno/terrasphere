@@ -1,7 +1,6 @@
-import { Plus, Type, AlignLeft, FileText, Image, Calendar as CalendarIcon, Layout, Grid3x3 } from 'lucide-react';
+import { Type, AlignLeft, FileText, Image, Calendar as CalendarIcon, Layout, Grid3x3 } from 'lucide-react';
 import { useDrag } from 'react-dnd';
 import { EditorElement, DEFAULT_PROPERTIES } from './ElementTypes';
-import { useState } from 'react';
 
 interface EditorSidebarProps {
   onAddElement: (element: EditorElement) => void;
@@ -226,7 +225,9 @@ function DraggableElementButton({ element, onCreate, onAddElement, showGridModal
 
   return (
     <button
-      ref={drag}
+      ref={(node) => {
+        drag(node);
+      }}
       onClick={handleClick}
       disabled={shouldBlur}
       className={`group flex flex-col items-center justify-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-${element.color}-400 dark:hover:border-${element.color}-500 hover:bg-${element.color}-50/50 dark:hover:bg-${element.color}-950/30 transition-all hover:scale-105 active:scale-95 cursor-grab active:cursor-grabbing ${

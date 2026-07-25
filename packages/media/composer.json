@@ -1,0 +1,23 @@
+{
+    "name": "terrasphere/media",
+    "description": "Media library and used-image discovery for TerraSphere CMS.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.5",
+        "inertiajs/inertia-laravel": "^3.0",
+        "terrasphere/core": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "TerraSphere\\Media\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TerraSphere\\Media\\MediaServiceProvider"
+            ]
+        }
+    }
+}

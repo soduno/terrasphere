@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "febcf9f59f3d478091b46402db61b041",
+    "content-hash": "572e9fa141f9725bdf648c99519bb073",
     "packages": [
         {
             "name": "brick/math",
@@ -5689,6 +5689,41 @@
             }
         },
         {
+            "name": "terrasphere/media",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/media",
+                "reference": "fd8d131cec3f34f7b1e58414ddd665415006a19c"
+            },
+            "require": {
+                "inertiajs/inertia-laravel": "^3.0",
+                "php": "^8.5",
+                "terrasphere/core": "dev-main"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "TerraSphere\\Media\\MediaServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "TerraSphere\\Media\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Media library and used-image discovery for TerraSphere CMS.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "tijsverkoyen/css-to-inline-styles",
             "version": "v2.4.0",
             "source": {
@@ -5906,7 +5941,8 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "terrasphere/core": 20
+        "terrasphere/core": 20,
+        "terrasphere/media": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

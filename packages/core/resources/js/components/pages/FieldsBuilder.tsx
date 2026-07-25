@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Separator } from '../ui/separator';
 
 interface CustomField {
   id: string;

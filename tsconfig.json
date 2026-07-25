@@ -26,6 +26,8 @@
     "include": [
         "packages/core/resources/js/**/*.ts",
         "packages/core/resources/js/**/*.tsx",
+        "packages/media/resources/js/**/*.ts",
+        "packages/media/resources/js/**/*.tsx",
         "vite.config.ts"
     ]
 }
