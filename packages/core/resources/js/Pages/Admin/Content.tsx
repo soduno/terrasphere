@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
+import { api } from '@adapter/api';
 import {
   Plus,
   Search,
@@ -79,7 +80,8 @@ export default function Content({ pages }: ContentProps) {
     setIsDeleting(true);
 
     window.setTimeout(() => {
-      router.delete(`/admin/pages/${page.id}`, {
+      api.delete(`/admin/pages/${page.id}`, {
+        inertia: true,
         preserveScroll: true,
         onError: (errors) => {
           const message = Object.values(errors)[0];

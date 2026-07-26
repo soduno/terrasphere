@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, FileImage, ImageOff, LoaderCircle, Search } from 'lucide-react';
+import { api } from '@adapter/api';
 import {
   Dialog,
   DialogContent,
@@ -92,14 +93,9 @@ export function MediaPickerDialog({
     setIsLoading(true);
     setError(null);
 
-    fetch('/admin/media-picker', {
-      headers: { Accept: 'application/json' },
+    api.get<{ images: LibraryImage[] }>('/admin/media-picker', {
       signal: controller.signal,
     })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Unable to load the media library.');
-        return response.json() as Promise<{ images: LibraryImage[] }>;
-      })
       .then((data) => setImages(data.images))
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
@@ -123,7 +119,7 @@ export function MediaPickerDialog({
         <DialogHeader className="border-b border-gray-100 p-6 dark:border-gray-800">
           <DialogTitle className="text-gray-900 dark:text-white">Choose from Media</DialogTitle>
           <DialogDescription className="text-gray-500 dark:text-gray-400">
-            Select an uploaded image for this field.
+            Select an uploaded image for your content.
           </DialogDescription>
         </DialogHeader>
 

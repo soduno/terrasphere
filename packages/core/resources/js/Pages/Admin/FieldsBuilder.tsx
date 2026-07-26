@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
+import { api } from '@adapter/api';
 import {
   AlignLeft,
   ArrowLeft,
@@ -264,11 +265,15 @@ export default function FieldsBuilder({ page, errors = {} }: FieldsBuilderProps)
   };
 
   const handleSave = () => {
-    router.put(`/admin/pages/${page.id}/field-schema`, {
-      title: pageName,
-      slug: modelSlug,
-      rows: rows as any,
-    });
+    api.put(
+      `/admin/pages/${page.id}/field-schema`,
+      {
+        title: pageName,
+        slug: modelSlug,
+        rows: rows as any,
+      },
+      { inertia: true },
+    );
   };
 
   const totalFields = rows.reduce((total, row) => total + row.fields.length, 0);

@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
                 '@components': fileURLToPath(
                     new URL('./packages/core/resources/js/components', import.meta.url),
                 ),
+                '@adapter': fileURLToPath(
+                    new URL('./packages/core/resources/js/adapter', import.meta.url),
+                ),
                 '@ui': fileURLToPath(
                     new URL('./packages/core/resources/js/components/ui', import.meta.url),
                 ),

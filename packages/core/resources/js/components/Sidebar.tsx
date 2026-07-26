@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import { api } from '@adapter/api';
 import {
   FileText,
   Image,
@@ -84,15 +85,18 @@ export function Sidebar() {
           {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           <span className="text-sm">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
         </button>
-        <Link
-          href="/admin/logout"
-          method="post"
-          as="button"
+        <button
+          type="button"
+          onClick={() => api.post(
+            '/admin/logout',
+            {},
+            { inertia: true },
+          )}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-400 transition-all"
         >
           <LogOut className="w-5 h-5" />
           <span className="text-sm">Sign out</span>
-        </Link>
+        </button>
         <div className="px-5 py-4 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950 dark:via-purple-950 dark:to-pink-950 rounded-xl border border-indigo-100/50 dark:border-indigo-800/50">
           <p className="text-sm text-gray-900 dark:text-white">Pro Plan</p>
           <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Upgrade for more features</p>

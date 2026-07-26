@@ -173,8 +173,6 @@ final class PageController
 
     public function updateTitle(Request $request, Page $page): RedirectResponse
     {
-        abort_unless($page->content_type === 'custom_fields', 404);
-
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
         ]);

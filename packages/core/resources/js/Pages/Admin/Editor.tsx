@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { EditorSidebar } from '@components/editor/EditorSidebar';
@@ -7,13 +7,12 @@ import { EditorToolbar } from '@components/editor/EditorToolbar';
 import {
   EditorProperties,
   normalizePropertySectionOrder,
-  type PropertySectionId,
 } from '@components/editor/EditorProperties';
-import {
-  moveElementBetweenColumns,
-  type ColumnElementDragItem,
-  type EditorElement,
-} from '@components/editor/ElementTypes';
+import type { EditorElement } from '../../types/editor';
+import { useEditorAutosave } from '../../composables/editor/useEditorAutosave';
+import { useEditorElements } from '../../composables/editor/useEditorElements';
+import { useEditorImageUpload } from '../../composables/editor/useEditorImageUpload';
+import { useEditorPropertyOrder } from '../../composables/editor/useEditorPropertyOrder';
 
 interface EditorProps {
   page: {
@@ -27,58 +26,28 @@ interface EditorProps {
 }
 
 export default function Editor({ page, propertySectionOrder }: EditorProps) {
-  const [elements, setElements] = useState<EditorElement[]>(page.elements);
-  const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [showGridModal, setShowGridModal] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [orderedPropertySections, setOrderedPropertySections] = useState<PropertySectionId[]>(
-    () => normalizePropertySectionOrder(propertySectionOrder)
+  const propertyOrder = useEditorPropertyOrder(
+    normalizePropertySectionOrder(propertySectionOrder)
   );
-  const lockVersionRef = useRef(page.lockVersion);
-  const lastSavedElementsRef = useRef(JSON.stringify(page.elements));
+  const editor = useEditorElements(page.elements);
+  const saveStatus = useEditorAutosave({
+    pageId: page.id,
+    elements: editor.elements,
+    initialElements: page.elements,
+    initialLockVersion: page.lockVersion,
+  });
+  const {
+    isUploading: isUploadingImages,
+    error: imageUploadError,
+    upload: uploadImages,
+  } = useEditorImageUpload();
 
-  useEffect(() => {
-    const serializedElements = JSON.stringify(elements);
-    if (serializedElements === lastSavedElementsRef.current) return;
+  const uploadDroppedImages = async (files: File[], targetElementId: string | null) => {
+    const urls = await uploadImages(files);
+    if (!urls) return;
 
-    const timeout = window.setTimeout(async () => {
-      setSaveStatus('saving');
-
-      try {
-        const csrfToken = document
-          .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-          ?.content;
-        const response = await fetch(`/admin/pages/${page.id}/wysiwyg`, {
-          method: 'PUT',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken || '',
-          },
-          body: JSON.stringify({
-            elements,
-            lock_version: lockVersionRef.current,
-          }),
-        });
-
-        if (!response.ok) throw new Error('Unable to save page');
-
-        const result = await response.json();
-        lockVersionRef.current = result.lockVersion;
-        lastSavedElementsRef.current = serializedElements;
-        setSaveStatus('saved');
-      } catch {
-        setSaveStatus('error');
-      }
-    }, 800);
-
-    return () => window.clearTimeout(timeout);
-  }, [elements, page.id]);
-
-  const hasContainerElements = elements.some(el => el.type === 'flex' || el.type === 'grid');
-
-  const addElement = (element: EditorElement) => {
-    setElements([...elements, element]);
+    editor.insertImages(urls, targetElementId);
   };
 
   const addGridElement = (columnCount: number) => {
@@ -98,151 +67,59 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
       },
       children: [],
     };
-    addElement(gridElement);
+    editor.addElement(gridElement);
     setShowGridModal(false);
-  };
-
-  const updateElement = (id: string, updates: Partial<EditorElement>) => {
-    const updateRecursive = (els: EditorElement[]): EditorElement[] => {
-      return els.map((el) => {
-        if (el.id === id) {
-          return { ...el, ...updates };
-        }
-        if (el.children) {
-          return { ...el, children: updateRecursive(el.children) };
-        }
-        return el;
-      });
-    };
-    setElements(updateRecursive(elements));
-  };
-
-  const deleteElement = (id: string) => {
-    const deleteRecursive = (els: EditorElement[]): EditorElement[] => {
-      return els.filter((el) => {
-        if (el.id === id) return false;
-        if (el.children) {
-          el.children = deleteRecursive(el.children);
-        }
-        return true;
-      });
-    };
-    setElements(deleteRecursive(elements));
-    if (selectedElement === id) {
-      setSelectedElement(null);
-    }
-  };
-
-  const moveElement = (dragIndex: number, insertionIndex: number) => {
-    const newElements = [...elements];
-    const [draggedElement] = newElements.splice(dragIndex, 1);
-    if (!draggedElement) return;
-
-    const adjustedIndex = dragIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
-    newElements.splice(adjustedIndex, 0, draggedElement);
-    setElements(newElements);
-  };
-
-  const moveElementToColumn = (
-    item: ColumnElementDragItem,
-    targetParentId: string,
-    targetColumnIndex: number,
-    insertionIndex: number,
-  ) => {
-    setElements((currentElements) =>
-      moveElementBetweenColumns(
-        currentElements,
-        item,
-        targetParentId,
-        targetColumnIndex,
-        insertionIndex,
-      )
-    );
-  };
-
-  const duplicateElement = (id: string) => {
-    const findAndDuplicate = (els: EditorElement[]): EditorElement[] | null => {
-      for (let i = 0; i < els.length; i++) {
-        if (els[i].id === id) {
-          const clone = JSON.parse(JSON.stringify(els[i]));
-          clone.id = `element-${Date.now()}`;
-          const newEls = [...els];
-          newEls.splice(i + 1, 0, clone);
-          return newEls;
-        }
-      }
-      return null;
-    };
-    
-    const duplicated = findAndDuplicate(elements);
-    if (duplicated) {
-      setElements(duplicated);
-    }
-  };
-
-  const findElement = (els: EditorElement[], id: string | null): EditorElement | undefined => {
-    if (!id) return undefined;
-
-    for (const element of els) {
-      if (element.id === id) return element;
-      const child = findElement(element.children || [], id);
-      if (child) return child;
-    }
-
-    return undefined;
-  };
-
-  const selectedElementData = findElement(elements, selectedElement);
-
-  const savePropertySectionOrder = async (order: PropertySectionId[]) => {
-    setOrderedPropertySections(order);
-
-    const csrfToken = document
-      .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-      ?.content;
-
-    try {
-      const response = await fetch('/admin/user-settings/editor/property-order', {
-        method: 'PUT',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': csrfToken || '',
-        },
-        body: JSON.stringify({ property_section_order: order }),
-      });
-      if (!response.ok) throw new Error('Unable to save property order');
-    } catch {
-      // Keep the optimistic order for this session if persistence is temporarily unavailable.
-    }
   };
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
+      <div
+        className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950"
+        onDragOverCapture={(event) => {
+          if (
+            Array.from(event.dataTransfer.types)
+              .some((type) => type.toLowerCase() === 'files')
+          ) {
+            event.preventDefault();
+          }
+        }}
+        onDropCapture={(event) => {
+          if (event.dataTransfer.files.length > 0) {
+            event.preventDefault();
+          }
+        }}
+      >
         <EditorToolbar
+          pageId={page.id}
           title={page.title}
           saveStatus={saveStatus}
         />
         <div className="flex-1 flex overflow-hidden">
-          <EditorSidebar onAddElement={addElement} showGridModal={() => setShowGridModal(true)} hasContainerElements={hasContainerElements} />
+          <EditorSidebar
+            onAddElement={editor.addElement}
+            showGridModal={() => setShowGridModal(true)}
+            hasContainerElements={editor.hasContainerElements}
+          />
           <EditorCanvas
-            elements={elements}
-            selectedElement={selectedElement}
-            setSelectedElement={setSelectedElement}
-            updateElement={updateElement}
-            deleteElement={deleteElement}
-            duplicateElement={duplicateElement}
-            moveElement={moveElement}
-            moveElementToColumn={moveElementToColumn}
-            addElement={addElement}
-            hasContainerElements={hasContainerElements}
+            elements={editor.elements}
+            selectedElement={editor.selectedElementId}
+            setSelectedElement={editor.setSelectedElementId}
+            updateElement={editor.updateElement}
+            deleteElement={editor.deleteElement}
+            duplicateElement={editor.duplicateElement}
+            moveElement={editor.moveElement}
+            moveElementToColumn={editor.moveElementToColumn}
+            addElement={editor.addElement}
+            hasContainerElements={editor.hasContainerElements}
+            onDropImageFiles={uploadDroppedImages}
+            isUploadingImages={isUploadingImages}
+            imageUploadError={imageUploadError}
           />
           <EditorProperties
-            element={selectedElementData}
-            updateElement={updateElement}
-            sectionOrder={orderedPropertySections}
-            onSectionOrderChange={savePropertySectionOrder}
+            element={editor.selectedElement}
+            updateElement={editor.updateElement}
+            sectionOrder={propertyOrder.order}
+            onSectionOrderChange={propertyOrder.updateOrder}
           />
         </div>
       </div>

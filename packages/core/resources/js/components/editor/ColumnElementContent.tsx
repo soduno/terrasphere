@@ -1,0 +1,105 @@
+import { Image as ImageIcon } from 'lucide-react';
+import type { ColumnElementContentProps } from '../../types/editor';
+import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { Calendar } from '../ui/calendar';
+import {
+  getEditorElementStyle,
+  getFlexAlignment,
+} from './editorElementStyles';
+
+export function ColumnElementContent({
+  element,
+  editableRef,
+  isEditing,
+  onDoubleClick,
+  onInput,
+  onBlur,
+  onEmbeddedImageClick,
+}: ColumnElementContentProps) {
+  const style = getEditorElementStyle(element, 14);
+  const editableClassName = [
+    'outline-none transition-all',
+    element.type === 'wysiwyg' ? 'min-h-[60px]' : '',
+    isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : 'cursor-text',
+  ].filter(Boolean).join(' ');
+
+  if (
+    element.type === 'heading'
+    || element.type === 'text'
+    || element.type === 'wysiwyg'
+  ) {
+    return (
+      <div
+        ref={editableRef}
+        contentEditable={isEditing}
+        suppressContentEditableWarning
+        onDoubleClick={onDoubleClick}
+        onInput={onInput}
+        onBlur={onBlur}
+        onClick={
+          element.type === 'heading' ? undefined : onEmbeddedImageClick
+        }
+        style={style}
+        className={editableClassName}
+      />
+    );
+  }
+
+  if (element.type === 'image') {
+    const floatDirection = element.properties.float || 'none';
+    const alignment =
+      element.properties.contentAlign ?? element.properties.imageAlign;
+
+    return (
+      <div
+        style={{
+          ...style,
+          display: 'flex',
+          justifyContent: getFlexAlignment(alignment),
+        }}
+      >
+        {element.properties.imageUrl ? (
+          <ImageWithFallback
+            src={element.properties.imageUrl}
+            alt="Content"
+            className="max-w-full rounded-lg object-cover"
+            style={{
+              width:
+                floatDirection === 'none'
+                  ? element.properties.imageWidth || '60%'
+                  : '100%',
+              height: element.properties.imageHeight || 'auto',
+              borderRadius: `${element.properties.borderRadius || 0}px`,
+            }}
+          />
+        ) : (
+          <div className="flex aspect-video w-full max-w-sm flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/60">
+            <ImageIcon className="size-7" />
+            <p className="mt-2 text-xs font-medium">
+              Choose an image in Properties
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (element.type === 'calendar') {
+    return (
+      <div
+        style={{
+          ...style,
+          display: 'flex',
+          justifyContent: getFlexAlignment(element.properties.contentAlign),
+        }}
+      >
+        <Calendar
+          mode="single"
+          className="scale-90 rounded-lg border border-gray-200 shadow-sm dark:border-gray-700"
+        />
+      </div>
+    );
+  }
+
+  return null;
+}

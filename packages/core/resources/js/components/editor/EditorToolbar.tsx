@@ -1,17 +1,21 @@
-import { ArrowLeft, Eye, Save, Smartphone, Monitor } from 'lucide-react';
+import { ArrowLeft, Eye, LoaderCircle, Monitor, Pencil, Save, Smartphone } from 'lucide-react';
 import { router } from '@inertiajs/react';
+import { useEditablePageTitle } from '../../composables/editor/useEditablePageTitle';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Separator } from '../ui/separator';
-
-interface EditorToolbarProps {
-  title: string;
-  saveStatus: 'saved' | 'saving' | 'error';
-}
+import type { EditorToolbarProps } from '../../types/editor';
 
 export function EditorToolbar({
+  pageId,
   title,
   saveStatus,
 }: EditorToolbarProps) {
+  const pageTitle = useEditablePageTitle({
+    pageId,
+    initialTitle: title,
+  });
+
   return (
     <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-4">
@@ -25,8 +29,46 @@ export function EditorToolbar({
           Back
         </Button>
         <Separator orientation="vertical" className="h-6 bg-gray-200 dark:bg-gray-700" />
-        <div>
-          <p className="text-sm text-gray-900 dark:text-white">{title}</p>
+        <div className="min-w-0">
+          {pageTitle.isEditing ? (
+            <Input
+              value={pageTitle.title}
+              onChange={(event) => {
+                pageTitle.setTitle(event.target.value);
+              }}
+              onBlur={pageTitle.save}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
+
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  pageTitle.cancel();
+                }
+              }}
+              onFocus={(event) => event.currentTarget.select()}
+              autoFocus
+              maxLength={255}
+              aria-label="Page name"
+              className="h-8 w-64 rounded-lg border-indigo-400 px-2 text-sm font-medium ring-2 ring-indigo-500/15 dark:bg-gray-800 dark:text-white"
+            />
+          ) : (
+            <button
+              type="button"
+              onDoubleClick={pageTitle.startEditing}
+              disabled={pageTitle.isSaving || pageId === undefined}
+              title="Double-click to rename"
+              className="group -ml-2 flex max-w-72 items-center gap-2 rounded-md px-2 py-0.5 text-left text-sm text-gray-900 transition-colors hover:bg-gray-100 disabled:cursor-wait dark:text-white dark:hover:bg-gray-800"
+            >
+              <span className="truncate">{pageTitle.title}</span>
+              {pageTitle.isSaving
+                ? <LoaderCircle className="size-3.5 shrink-0 animate-spin text-gray-400" />
+                : <Pencil className="size-3 shrink-0 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100" />}
+            </button>
+          )}
+          {pageTitle.error && <p className="text-xs text-red-500">{pageTitle.error}</p>}
           <p className={`text-xs ${
             saveStatus === 'error'
               ? 'text-red-500'

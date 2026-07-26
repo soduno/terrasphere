@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { api } from '@adapter/api';
 import { Layout, FileEdit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@ui/dialog';
 
@@ -9,7 +9,8 @@ interface NewPageModalProps {
 
 export function NewPageModal({ open, onClose }: NewPageModalProps) {
   const handleSelectType = (contentType: 'wysiwyg' | 'custom_fields') => {
-    router.post('/admin/pages', { content_type: contentType }, {
+    api.post('/admin/pages', { content_type: contentType }, {
+      inertia: true,
       onSuccess: onClose,
     });
   };

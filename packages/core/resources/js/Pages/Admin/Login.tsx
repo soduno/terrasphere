@@ -1,6 +1,8 @@
-import { Form, Head } from '@inertiajs/react'
+import { Head } from '@inertiajs/react'
 import { Layers, LockKeyhole, Moon, Sun } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
 
+import { api } from '@adapter/api'
 import { ThemeProvider, useTheme } from '@components/ThemeProvider'
 import { Button } from '@ui/button'
 import { Checkbox } from '@ui/checkbox'
@@ -17,6 +19,30 @@ export default function Login() {
 
 function LoginPage() {
   const { theme, toggleTheme } = useTheme()
+  const [login, setLogin] = useState('mail@simonduun.com')
+  const [password, setPassword] = useState('1234')
+  const [remember, setRemember] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [processing, setProcessing] = useState(false)
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setErrors({})
+
+    api.post(
+      '/admin/login',
+      { login, password, remember },
+      {
+        inertia: true,
+        onStart: () => setProcessing(true),
+        onError: (nextErrors) => {
+          setErrors(nextErrors as Record<string, string>)
+        },
+        onSuccess: () => setPassword(''),
+        onFinish: () => setProcessing(false),
+      },
+    )
+  }
 
   return (
     <>
@@ -42,9 +68,7 @@ function LoginPage() {
               </button>
             </div>
 
-            <Form action="/admin/login" method="post" resetOnSuccess={['password']} className="space-y-5">
-              {({ errors, processing }) => (
-                <>
+            <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="login">Email or username</Label>
                     <Input
@@ -52,7 +76,8 @@ function LoginPage() {
                       name="login"
                       type="text"
                       autoComplete="username"
-                      defaultValue="mail@simonduun.com"
+                      value={login}
+                      onChange={(event) => setLogin(event.target.value)}
                       autoFocus
                       required
                       aria-invalid={Boolean(errors.login)}
@@ -68,7 +93,8 @@ function LoginPage() {
                       name="password"
                       type="password"
                       autoComplete="current-password"
-                      defaultValue="1234"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
                       required
                       aria-invalid={Boolean(errors.password)}
                       className="h-11 rounded-xl"
@@ -82,8 +108,8 @@ function LoginPage() {
                   >
                     <Checkbox
                       id="remember"
-                      name="remember"
-                      value="1"
+                      checked={remember}
+                      onCheckedChange={(checked) => setRemember(checked === true)}
                       className="h-5 w-5 rounded-md border-2 border-gray-300 bg-white shadow-sm transition-all data-[state=checked]:scale-105 data-[state=checked]:border-indigo-600 data-[state=checked]:bg-indigo-600 data-[state=checked]:text-white focus-visible:border-indigo-500 focus-visible:ring-indigo-500/25 dark:border-gray-600 dark:bg-gray-800 dark:data-[state=checked]:border-indigo-500 dark:data-[state=checked]:bg-indigo-500"
                     />
                     <span className="font-medium text-gray-600 transition-colors group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-gray-200">
@@ -99,9 +125,7 @@ function LoginPage() {
                     <LockKeyhole className="h-4 w-4" />
                     {processing ? 'Signing in…' : 'Sign in'}
                   </Button>
-                </>
-              )}
-            </Form>
+            </form>
           </section>
         </div>
       </main>

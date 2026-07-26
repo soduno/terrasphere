@@ -6,10 +6,10 @@ import { EditorCanvas } from '../editor/EditorCanvas';
 import { EditorToolbar } from '../editor/EditorToolbar';
 import { EditorProperties } from '../editor/EditorProperties';
 import {
-  moveElementBetweenColumns,
   type ColumnElementDragItem,
   type EditorElement,
-} from '../editor/ElementTypes';
+} from '../../types/editor';
+import { moveElementBetweenColumns } from '../../composables/editor/elementTree';
 
 export function Editor() {
   const [elements, setElements] = useState<EditorElement[]>([]);

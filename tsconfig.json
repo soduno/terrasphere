@@ -8,6 +8,8 @@
         "paths": {
             "@components": ["./packages/core/resources/js/components"],
             "@components/*": ["./packages/core/resources/js/components/*"],
+            "@adapter": ["./packages/core/resources/js/adapter"],
+            "@adapter/*": ["./packages/core/resources/js/adapter/*"],
             "@ui": ["./packages/core/resources/js/components/ui"],
             "@ui/*": ["./packages/core/resources/js/components/ui/*"],
             "@media": ["./packages/media/resources/js"],

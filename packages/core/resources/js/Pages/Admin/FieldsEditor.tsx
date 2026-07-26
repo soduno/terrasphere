@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from 'react';
 import { router } from '@inertiajs/react';
+import { api, ApiError } from '@adapter/api';
 import {
   ArrowLeft,
   AlignLeft,
@@ -132,9 +133,11 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
   };
 
   const handleSave = () => {
-    router.put(`/admin/pages/${page.id}/field-values`, {
-      values: fieldValues,
-    });
+    api.put(
+      `/admin/pages/${page.id}/field-values`,
+      { values: fieldValues },
+      { inertia: true },
+    );
   };
 
   const handleEditFields = () => {
@@ -160,10 +163,11 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
     }
 
     setIsSavingTitle(true);
-    router.patch(
+    api.patch(
       `/admin/pages/${page.id}/title`,
       { title },
       {
+        inertia: true,
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
@@ -210,35 +214,15 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
 
     const formData = new FormData();
     files.forEach((file) => formData.append('images[]', file));
-    const csrfToken = document
-      .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-      ?.getAttribute('content') ?? '';
 
     setUploadingMediaField(fieldName);
     setMediaUploadErrors((current) => ({ ...current, [fieldName]: '' }));
 
     try {
-      const response = await fetch('/admin/media', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'X-CSRF-TOKEN': csrfToken,
-        },
-        credentials: 'same-origin',
-        body: formData,
-      });
-      const payload = await response.json() as {
-        images?: Array<{ url: string }>;
-        errors?: Record<string, string[]>;
-        message?: string;
-      };
-
-      if (!response.ok || !payload.images) {
-        const validationError = payload.errors
-          ? Object.values(payload.errors).flat()[0]
-          : undefined;
-        throw new Error(validationError ?? payload.message ?? 'The images could not be uploaded.');
-      }
+      const payload = await api.post<{ images: Array<{ url: string }> }>(
+        '/admin/media',
+        formData,
+      );
 
       const uploadedUrls = payload.images.map((image) => image.url);
       setFieldValues((current) => ({
@@ -248,11 +232,15 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
           : uploadedUrls[0],
       }));
     } catch (reason) {
+      const validationError = reason instanceof ApiError
+        ? Object.values(reason.errors).flat()[0]
+        : undefined;
       setMediaUploadErrors((current) => ({
         ...current,
-        [fieldName]: reason instanceof Error
+        [fieldName]: validationError
+        ?? (reason instanceof Error
           ? reason.message
-          : 'The images could not be uploaded.',
+          : 'The images could not be uploaded.'),
       }));
     } finally {
       setUploadingMediaField(null);

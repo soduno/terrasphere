@@ -1,4 +1,5 @@
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
+import { api } from '@adapter/api';
 import {
   Check,
   Copy,
@@ -126,10 +127,11 @@ export default function MediaIndex({ images, summary }: MediaProps) {
     setIsUploading(true);
     setUploadProgress(0);
 
-    router.post(
+    api.post(
       '/admin/media',
       { images: files },
       {
+        inertia: true,
         forceFormData: true,
         preserveScroll: true,
         onProgress: (progress) => setUploadProgress(progress?.percentage ?? 0),
@@ -171,7 +173,8 @@ export default function MediaIndex({ images, summary }: MediaProps) {
     setDeleteTarget(null);
 
     window.setTimeout(() => {
-      router.delete(image.deleteUrl!, {
+      api.delete(image.deleteUrl!, {
+        inertia: true,
         preserveScroll: true,
         onError: (errors) => {
           setDeleteTarget(image);

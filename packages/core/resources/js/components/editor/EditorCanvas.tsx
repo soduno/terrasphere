@@ -1,31 +1,7 @@
-import { type ColumnElementDragItem, type EditorElement } from './ElementTypes';
-import { DraggableElement } from './DraggableElement';
-import { useDrop } from 'react-dnd';
-import { useState } from 'react';
-import { motion } from 'motion/react';
-
-interface EditorCanvasProps {
-  elements: EditorElement[];
-  selectedElement: string | null;
-  setSelectedElement: (id: string | null) => void;
-  updateElement: (id: string, updates: Partial<EditorElement>) => void;
-  deleteElement: (id: string) => void;
-  duplicateElement: (id: string) => void;
-  moveElement: (dragIndex: number, hoverIndex: number) => void;
-  moveElementToColumn: (
-    item: ColumnElementDragItem,
-    targetParentId: string,
-    targetColumnIndex: number,
-    insertionIndex: number,
-  ) => void;
-  addElement: (element: EditorElement) => void;
-  hasContainerElements: boolean;
-}
-
-interface NewCanvasElementItem {
-  createElement: () => EditorElement;
-  isLayout?: boolean;
-}
+import { useEditorCanvasInteractions } from '../../composables/editor/useEditorCanvasInteractions';
+import type { EditorCanvasProps } from '../../types/editor';
+import { EditorCanvasContent } from './EditorCanvasContent';
+import { EditorCanvasFeedback } from './EditorCanvasFeedback';
 
 export function EditorCanvas({
   elements,
@@ -38,174 +14,57 @@ export function EditorCanvas({
   moveElementToColumn,
   addElement,
   hasContainerElements,
+  onDropImageFiles = async () => undefined,
+  isUploadingImages = false,
+  imageUploadError = null,
 }: EditorCanvasProps) {
-  const [justDropped, setJustDropped] = useState(false);
-  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
-  
-  const [{ isOver, canDrop }, drop] = useDrop<
-    NewCanvasElementItem,
-    void,
-    { isOver: boolean; canDrop: boolean }
-  >({
-    accept: 'new-element',
-    drop: (item, monitor) => {
-      // Only add to main canvas if not already handled by a nested drop zone
-      const didDrop = monitor.didDrop();
-      if (!didDrop) {
-        // Only allow layout elements on the main canvas
-        if (!item.isLayout) {
-          return; // Prevent drop - non-layout elements must go inside containers
-        }
-        const newElement = item.createElement();
-        addElement(newElement);
-        
-        // Trigger drop animation
-        setJustDropped(true);
-        setTimeout(() => setJustDropped(false), 600);
-      }
-    },
-    canDrop: (item) => {
-      // Only allow layout elements on the main canvas
-      return !!item.isLayout;
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver({ shallow: true }),
-      canDrop: monitor.canDrop(),
-    }),
+  const interactions = useEditorCanvasInteractions({
+    addElement,
+    onDropImageFiles,
   });
-
-  const showError = isOver && !canDrop;
+  const canvasStateClass = interactions.showError
+    ? 'bg-red-500/5'
+    : interactions.isOver && interactions.canDrop
+      ? 'bg-indigo-500/5'
+      : interactions.justDropped
+        ? 'bg-green-500/5'
+        : '';
 
   return (
-    <div 
+    <div
       ref={(node) => {
-        drop(node);
+        interactions.drop(node);
       }}
       onClick={() => setSelectedElement(null)}
-      onMouseOver={(e) => {
-        const target = e.target;
-        const elementRoot = target instanceof Element
-          ? target.closest<HTMLElement>('[data-editor-element-id]')
-          : null;
-        setHoveredElement(elementRoot?.dataset.editorElementId ?? null);
-      }}
-      onMouseLeave={() => setHoveredElement(null)}
-      className={`flex-1 overflow-auto bg-white p-12 transition-all relative ${
-        isOver && canDrop
-          ? 'bg-indigo-500/5' 
-          : showError
-          ? 'bg-red-500/5'
-          : justDropped
-          ? 'bg-green-500/5'
-          : ''
-      }`}
+      onMouseOver={interactions.handleMouseOver}
+      onMouseLeave={() => interactions.setHoveredElement(null)}
+      onDragEnter={interactions.handleDragEnter}
+      onDragOver={interactions.handleDragOver}
+      onDragLeave={interactions.handleDragLeave}
+      onDrop={interactions.handleDrop}
+      className={`relative flex-1 overflow-auto bg-white p-12 transition-all ${canvasStateClass}`}
     >
-      {showError && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-          <div className="bg-red-500 rounded-full p-8 shadow-2xl shadow-red-500/50 animate-pulse">
-            <svg className="w-16 h-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-        </div>
-      )}
-      
-      {justDropped && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-          <div className="bg-green-500 rounded-full p-8 shadow-2xl shadow-green-500/50 animate-in zoom-in-95 fade-out duration-500">
-            <svg className="w-16 h-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        </div>
-      )}
-      
-      {elements.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-full text-center py-32">
-          {showError ? (
-            <>
-              <div className="w-20 h-20 bg-red-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-red-500/30">
-                <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h3 className="text-xl text-gray-900 mb-2">
-                Cannot Drop Here
-              </h3>
-              <p className="text-gray-500 max-w-md">
-                Content elements must be placed inside Flex or Grid containers
-              </p>
-            </>
-          ) : (
-            <>
-              <div className={`w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/30 transition-transform ${
-                isOver ? 'scale-110' : 'scale-100'
-              }`}>
-                <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <h3 className="text-xl text-gray-900 mb-2">
-                {isOver ? 'Drop to Add Element' : 'Start Building'}
-              </h3>
-              <p className="text-gray-500 max-w-md">
-                {isOver 
-                  ? 'Release to add this element to your page' 
-                  : 'Drag layout containers from the sidebar to create your page. Double-click text to edit.'}
-              </p>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="flow-root space-y-1">
-          {elements.map((element, index) => {
-            const isContainer = element.type === 'flex' || element.type === 'grid';
-            const shouldBlur = !hasContainerElements || isContainer;
-            
-            return (
-              <motion.div
-                key={element.id}
-                layout="position"
-                transition={{
-                  layout: {
-                    type: 'spring',
-                    stiffness: 500,
-                    damping: 38,
-                    mass: 0.55,
-                  },
-                }}
-                className={`transition-all duration-300 ${
-                  !shouldBlur ? 'blur-sm opacity-50 pointer-events-none' : ''
-                }`}
-              >
-                <DraggableElement
-                  element={element}
-                  index={index}
-                  isSelected={selectedElement === element.id}
-                  hoveredElement={hoveredElement}
-                  onSelect={() => setSelectedElement(element.id)}
-                  selectedElement={selectedElement}
-                  onSelectElement={setSelectedElement}
-                  onUpdate={updateElement}
-                  onDelete={deleteElement}
-                  onDuplicate={duplicateElement}
-                  onMove={moveElement}
-                  onMoveElementToColumn={moveElementToColumn}
-                />
-              </motion.div>
-            );
-          })}
-          {!hasContainerElements && elements.length > 0 && (
-            <div className="flex items-center justify-center py-8">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 max-w-md text-center">
-                <p className="text-sm text-yellow-800">
-                  <strong>Tip:</strong> Add a Flex or Grid container first to organize your layout
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <EditorCanvasFeedback
+        isFileDragging={interactions.isFileDragging}
+        isUploadingImages={isUploadingImages}
+        imageUploadError={imageUploadError}
+        showError={interactions.showError}
+        justDropped={interactions.justDropped}
+      />
+      <EditorCanvasContent
+        elements={elements}
+        selectedElement={selectedElement}
+        hoveredElement={interactions.hoveredElement}
+        isOver={interactions.isOver}
+        showError={interactions.showError}
+        hasContainerElements={hasContainerElements}
+        setSelectedElement={setSelectedElement}
+        updateElement={updateElement}
+        deleteElement={deleteElement}
+        duplicateElement={duplicateElement}
+        moveElement={moveElement}
+        moveElementToColumn={moveElementToColumn}
+      />
     </div>
   );
 }
