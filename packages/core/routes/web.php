@@ -26,6 +26,8 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
             Route::get('/', DashboardController::class)->name('dashboard');
             Route::get('/content', [PageController::class, 'index'])->name('content');
             Route::post('/pages', [PageController::class, 'store'])->name('pages.store');
+            Route::delete('/pages', [PageController::class, 'destroyMany'])
+                ->name('pages.destroy-many');
             Route::delete('/pages/{page}', [PageController::class, 'destroy'])
                 ->name('pages.destroy');
             Route::get('/settings', fn (): Response => Inertia::render('Admin/Settings'))

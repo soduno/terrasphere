@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { EditorSidebar } from '../editor/EditorSidebar';
 import { EditorCanvas } from '../editor/EditorCanvas';
 import { EditorToolbar } from '../editor/EditorToolbar';
 import { EditorProperties } from '../editor/EditorProperties';
+import { TerraGravityProvider } from '../editor/terra-gravity/TerraGravity';
+import { GridColumnSelectionProvider } from '../editor/GridColumnSelection';
 import {
-  type ColumnElementDragItem,
+  type EditorElementDragItem,
   type EditorElement,
 } from '../../types/editor';
-import { moveElementBetweenColumns } from '../../composables/editor/elementTree';
+import {
+  moveEditorElement,
+  moveElementBetweenColumns,
+} from '../../composables/editor/elementTree';
 
 export function Editor() {
   const [elements, setElements] = useState<EditorElement[]>([]);
@@ -35,6 +38,13 @@ export function Editor() {
         borderRadius: '0',
         columnGap: '20',
         columnCount,
+        columnProperties: Array.from({ length: columnCount }, () => ({
+          padding: '12',
+          paddingLinked: true,
+          margin: '0',
+          marginLinked: true,
+          verticalAlign: 'top' as const,
+        })),
       },
       children: [],
     };
@@ -73,18 +83,17 @@ export function Editor() {
     }
   };
 
-  const moveElement = (dragIndex: number, insertionIndex: number) => {
-    const newElements = [...elements];
-    const [draggedElement] = newElements.splice(dragIndex, 1);
-    if (!draggedElement) return;
-
-    const adjustedIndex = dragIndex < insertionIndex ? insertionIndex - 1 : insertionIndex;
-    newElements.splice(adjustedIndex, 0, draggedElement);
-    setElements(newElements);
+  const moveElement = (
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => {
+    setElements((currentElements) =>
+      moveEditorElement(currentElements, item, insertionIndex)
+    );
   };
 
   const moveElementToColumn = (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,
@@ -135,8 +144,9 @@ export function Editor() {
   const selectedElementData = findElement(elements, selectedElement);
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
+    <TerraGravityProvider>
+      <GridColumnSelectionProvider>
+        <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
         <EditorToolbar
           title="Untitled Page"
           saveStatus="saved"
@@ -160,11 +170,11 @@ export function Editor() {
             updateElement={updateElement}
           />
         </div>
-      </div>
+        </div>
 
-      {/* Grid Column Count Modal */}
-      {showGridModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
+        {/* Grid Column Count Modal */}
+        {showGridModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
             <h2 className="text-2xl text-gray-900 dark:text-white mb-2">Grid Container</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
@@ -189,8 +199,9 @@ export function Editor() {
               Cancel
             </button>
           </div>
-        </div>
-      )}
-    </DndProvider>
+          </div>
+        )}
+      </GridColumnSelectionProvider>
+    </TerraGravityProvider>
   );
 }

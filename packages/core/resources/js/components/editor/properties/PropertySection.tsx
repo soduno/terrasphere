@@ -1,10 +1,13 @@
 import { useRef } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
 import { GripVertical } from 'lucide-react';
 import type {
-  PropertySectionId,
+  EditorDragPayload,
   PropertySectionProps,
 } from '../../../types/editor';
+import {
+  useGravitySource,
+  useGravityTarget,
+} from '../terra-gravity/TerraGravity';
 import {
   Accordion,
   AccordionContent,
@@ -22,46 +25,52 @@ export function PropertySection({
   onDrop,
 }: PropertySectionProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<HTMLButtonElement>(null);
-  const [{ isDragging }, drag] = useDrag({
-    type: 'property-section',
-    item: { id: sectionId, index: position },
-    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
-  });
-  const [, drop] = useDrop({
-    accept: 'property-section',
-    hover: (
-      item: { id: PropertySectionId; index: number },
-      monitor,
-    ) => {
-      if (!sectionRef.current || item.id === sectionId) return;
-
-      const pointer = monitor.getClientOffset();
-      if (!pointer) return;
-
-      const bounds = sectionRef.current.getBoundingClientRect();
-      const pointerOffset = pointer.y - bounds.top;
-      const middle = (bounds.bottom - bounds.top) / 2;
-      if (item.index < position && pointerOffset < middle) return;
-      if (item.index > position && pointerOffset > middle) return;
-
-      onMove(item.index, position);
-      item.index = position;
+  const dragSource = useGravitySource({
+    payload: {
+      kind: 'property-section',
+      id: sectionId,
+      index: position,
     },
-    drop: onDrop,
+    previewLabel: `Move ${title}`,
   });
+  const dropTarget = useGravityTarget<
+    Extract<EditorDragPayload, { kind: 'property-section' }>
+  >({
+    accepts: (
+      payload,
+    ): payload is Extract<
+      EditorDragPayload,
+      { kind: 'property-section' }
+    > => payload.kind === 'property-section',
+    onMove: ({ payload, point, rect }) => {
+      if (payload.id === sectionId) return;
 
-  drag(handleRef);
-  drop(sectionRef);
+      const pointerOffset = point.y - rect.top;
+      const middle = rect.height / 2;
+      if (payload.index < position && pointerOffset < middle) return;
+      if (payload.index > position && pointerOffset > middle) return;
+
+      onMove(payload.index, position);
+      payload.index = position;
+    },
+    onDrop,
+  });
 
   return (
     <div
-      ref={sectionRef}
+      ref={(node) => {
+        sectionRef.current = node;
+        dropTarget.dropTargetRef(node);
+      }}
       style={{ order: position }}
-      className={isDragging ? 'relative opacity-40' : 'relative opacity-100'}
+      className={
+        dragSource.isDragging
+          ? 'relative opacity-40'
+          : 'relative opacity-100'
+      }
     >
       <button
-        ref={handleRef}
+        ref={dragSource.dragHandleRef}
         type="button"
         aria-label={`Drag to reorder ${title}`}
         title={`Drag to reorder ${title}`}

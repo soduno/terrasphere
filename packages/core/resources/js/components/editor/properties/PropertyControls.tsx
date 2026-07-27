@@ -122,7 +122,15 @@ export function SpacingControl({
       return;
     }
 
-    onChange({ [linkedKey]: true, [baseKey]: baseValue.toString() });
+    const stringValue = baseValue.toString();
+    onChange({
+      [linkedKey]: true,
+      [baseKey]: stringValue,
+      [sides[0].key]: stringValue,
+      [sides[1].key]: stringValue,
+      [sides[2].key]: stringValue,
+      [sides[3].key]: stringValue,
+    });
   };
 
   return (

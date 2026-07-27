@@ -45,7 +45,7 @@ export function EditorSidebar({
         <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
           <p>• Drag layout containers first</p>
           <p>• Add elements into containers</p>
-          <p>• Double-click text to edit</p>
+          <p>• Click text to edit</p>
           <p>• Use properties panel to style</p>
         </div>
       </div>

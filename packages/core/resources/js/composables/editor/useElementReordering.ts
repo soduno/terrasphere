@@ -1,64 +1,65 @@
 import { useRef, useState } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
+import {
+  useGravitySource,
+  useGravityTarget,
+} from '../../components/editor/terra-gravity/TerraGravity';
 import type {
   DropPosition,
-  ElementDragItem,
+  EditorDragPayload,
   UseElementReorderingOptions,
 } from '../../types/editor';
 
+type RootElementPayload = Extract<
+  EditorDragPayload,
+  { kind: 'root-element' | 'column-element' }
+>;
+
 export function useElementReordering({
+  elementId,
   index,
   onMove,
 }: UseElementReorderingOptions) {
   const elementRef = useRef<HTMLDivElement>(null);
-  const [dropPosition, setDropPosition] = useState<DropPosition>('before');
-  const [{ isDragging }, drag, preview] = useDrag<
-    ElementDragItem,
-    void,
-    { isDragging: boolean }
-  >({
-    type: 'element',
-    item: { index },
-    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  const [dropPosition, setDropPosition] =
+    useState<DropPosition>('before');
+  const dropPositionRef = useRef<DropPosition>('before');
+  const dragSource = useGravitySource({
+    payload: {
+      kind: 'root-element',
+      elementId,
+      sourceParentId: null,
+      sourceColumnIndex: null,
+      sourceIndex: index,
+    },
+    previewLabel: 'Move element',
   });
-  const [{ isOverTarget }, drop] = useDrop<
-    ElementDragItem,
-    void,
-    { isOverTarget: boolean }
-  >({
-    accept: 'element',
-    hover: (item, monitor) => {
-      const pointer = monitor.getClientOffset();
-      if (!elementRef.current || !pointer) return;
-
-      const bounds = elementRef.current.getBoundingClientRect();
-      const position = pointer.y < bounds.top + bounds.height / 2
-        ? 'before'
-        : 'after';
-      item.dropPosition = position;
+  const dropTarget = useGravityTarget<RootElementPayload>({
+    accepts: (payload): payload is RootElementPayload =>
+      (
+        payload.kind === 'root-element'
+        || payload.kind === 'column-element'
+      )
+      && payload.elementId !== elementId,
+    onMove: ({ point, rect }) => {
+      const position =
+        point.y < rect.top + rect.height / 2 ? 'before' : 'after';
+      dropPositionRef.current = position;
       setDropPosition(position);
     },
-    drop: (item) => {
-      if (item.index === index) return;
-
-      const insertionIndex =
-        (item.dropPosition ?? dropPosition) === 'after'
-          ? index + 1
-          : index;
-      onMove(item.index, insertionIndex);
+    onDrop: ({ payload }) => {
+      onMove(
+        payload,
+        dropPositionRef.current === 'after' ? index + 1 : index,
+      );
     },
-    collect: (monitor) => ({
-      isOverTarget: monitor.isOver({ shallow: true }),
-    }),
   });
-
-  preview(drop(elementRef));
 
   return {
     elementRef,
-    drag,
+    drag: dragSource.dragHandleRef,
     dropPosition,
-    isDragging,
-    isOverTarget,
+    dropTargetRef: dropTarget.dropTargetRef,
+    isDragging: dragSource.isDragging,
+    isOverTarget: dropTarget.isOver,
   };
 }

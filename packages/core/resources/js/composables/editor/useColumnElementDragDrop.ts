@@ -1,15 +1,25 @@
-import { useState } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
+import { useRef, useState } from 'react';
 import {
-  COLUMN_ELEMENT_DRAG_TYPE,
-  type ColumnDropItem,
-  type ColumnElementDragItem,
-  type DropPosition,
-  type EditorElement,
-  type UseColumnElementDragDropOptions,
+  useGravitySource,
+  useGravityTarget,
+} from '../../components/editor/terra-gravity/TerraGravity';
+import type {
+  DropPosition,
+  EditorDragPayload,
+  EditorElement,
+  UseColumnElementDragDropOptions,
 } from '../../types/editor';
 
-type DropResult = { handled: true } | void;
+type ColumnTargetPayload = Extract<
+  EditorDragPayload,
+  {
+    kind:
+      | 'root-element'
+      | 'column-element'
+      | 'sidebar-element'
+      | 'embedded-image';
+  }
+>;
 
 function createEmbeddedImage(element: EditorElement) {
   const image = document.createElement('img');
@@ -48,13 +58,17 @@ export function useColumnElementDragDrop({
 }: UseColumnElementDragDropOptions) {
   const [dropPosition, setDropPosition] =
     useState<DropPosition>('before');
+  const dropPositionRef = useRef<DropPosition>('before');
   const [embeddedDropY, setEmbeddedDropY] = useState<number | null>(null);
-  const [embeddedInsertionIndex, setEmbeddedInsertionIndex] = useState(0);
+  const embeddedInsertionIndexRef = useRef(0);
   const [imageDropPoint, setImageDropPoint] = useState<{
     localY: number;
     insertionIndex: number;
   } | null>(null);
-  const embeddedDragType = `embedded-image-${element.id}`;
+  const imageDropPointRef = useRef<{
+    localY: number;
+    insertionIndex: number;
+  } | null>(null);
 
   const contentInsertionPoint = (clientY: number) => {
     const target = editableRef.current;
@@ -113,81 +127,76 @@ export function useColumnElementDragDrop({
     onUpdate(element.id, { content });
   };
 
-  const [{ isDragging }, drag, preview] = useDrag<
-    ColumnElementDragItem,
-    void,
-    { isDragging: boolean }
-  >({
-    type: COLUMN_ELEMENT_DRAG_TYPE,
-    item: {
+  const elementDragSource = useGravitySource({
+    payload: {
+      kind: 'column-element',
       elementId: element.id,
       sourceParentId: parentId,
       sourceColumnIndex: columnIndex,
       sourceIndex: index,
     },
-    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    previewLabel: 'Move element',
   });
-  const [, embeddedDrag] = useDrag({
-    type: embeddedDragType,
-    item: () => ({ embeddedImageId }),
-    canDrag: () => !!embeddedImageId,
-  });
-  const [dropState, drop] = useDrop<
-    ColumnDropItem,
-    DropResult,
-    {
-      isOverTarget: boolean;
-      isOverImageTarget: boolean;
-      isOverEmbeddedTarget: boolean;
-      isOverNewElementTarget: boolean;
-    }
-  >({
-    accept: [COLUMN_ELEMENT_DRAG_TYPE, 'new-element', embeddedDragType],
-    canDrop: (item, monitor) => {
-      if (monitor.getItemType() === COLUMN_ELEMENT_DRAG_TYPE) return true;
-      if (monitor.getItemType() === embeddedDragType) {
-        return !!item.embeddedImageId;
-      }
-      return !item.isLayout;
+  const embeddedImageDragSource = useGravitySource({
+    payload: {
+      kind: 'embedded-image',
+      ownerElementId: element.id,
+      embeddedImageId: embeddedImageId ?? '',
     },
-    hover: (item, monitor) => {
-      const pointer = monitor.getClientOffset();
-      if (!elementRef.current || !pointer) return;
-
-      if (monitor.getItemType() === embeddedDragType) {
-        const insertion = contentInsertionPoint(pointer.y);
+    disabled: !embeddedImageId,
+    previewLabel: 'Move image',
+  });
+  const dropTarget = useGravityTarget<ColumnTargetPayload>({
+    accepts: (payload): payload is ColumnTargetPayload => {
+      if (
+        payload.kind === 'root-element'
+        || payload.kind === 'column-element'
+      ) return payload.elementId !== element.id;
+      if (payload.kind === 'embedded-image') {
+        return (
+          payload.ownerElementId === element.id
+          && Boolean(payload.embeddedImageId)
+        );
+      }
+      return payload.kind === 'sidebar-element';
+    },
+    onMove: ({ payload, point, rect }) => {
+      if (payload.kind === 'embedded-image') {
+        const insertion = contentInsertionPoint(point.y);
+        embeddedInsertionIndexRef.current = insertion.insertionIndex;
         setEmbeddedDropY(insertion.localY);
-        setEmbeddedInsertionIndex(insertion.insertionIndex);
         return;
       }
 
       if (
-        monitor.getItemType() === 'new-element'
-        && item.elementType === 'image'
+        payload.kind === 'sidebar-element'
+        && payload.elementType === 'image'
         && (element.type === 'text' || element.type === 'wysiwyg')
       ) {
-        setImageDropPoint(contentInsertionPoint(pointer.y));
+        const insertion = contentInsertionPoint(point.y);
+        imageDropPointRef.current = insertion;
+        setImageDropPoint(insertion);
         return;
       }
 
-      const bounds = elementRef.current.getBoundingClientRect();
       const position =
-        pointer.y < bounds.top + bounds.height / 2 ? 'before' : 'after';
-      item.dropPosition = position;
+        point.y < rect.top + rect.height / 2 ? 'before' : 'after';
+      dropPositionRef.current = position;
       setDropPosition(position);
     },
-    drop: (item, monitor) => {
-      if (monitor.getItemType() === embeddedDragType) {
+    onDrop: ({ payload }) => {
+      if (payload.kind === 'embedded-image') {
         const target = editableRef.current;
-        const image = item.embeddedImageId
-          ? target?.querySelector<HTMLImageElement>(
-              `img[data-editor-embedded-image="${item.embeddedImageId}"]`,
-            )
-          : null;
+        const image = target?.querySelector<HTMLImageElement>(
+          `img[data-editor-embedded-image="${payload.embeddedImageId}"]`,
+        );
         if (!target || !image) return;
 
         const previousParent = image.parentElement;
-        insertAtContentBoundary(image, embeddedInsertionIndex);
+        insertAtContentBoundary(
+          image,
+          embeddedInsertionIndexRef.current,
+        );
         if (
           previousParent
           && previousParent !== target
@@ -198,81 +207,76 @@ export function useColumnElementDragDrop({
         saveContent();
         requestAnimationFrame(() => positionEmbeddedImage(image));
         setEmbeddedDropY(null);
-        return { handled: true };
+        return;
       }
 
-      if (monitor.getItemType() === 'new-element') {
-        if (!item.createElement) return;
-        const newElement = item.createElement();
+      if (payload.kind === 'sidebar-element') {
+        const newElement = payload.createElement();
         const shouldEmbedImage =
-          item.elementType === 'image'
+          payload.elementType === 'image'
           && (element.type === 'text' || element.type === 'wysiwyg')
-          && !!newElement.properties.imageUrl;
+          && Boolean(newElement.properties.imageUrl);
 
         if (!shouldEmbedImage) {
-          const insertionIndex =
-            (item.dropPosition ?? dropPosition) === 'after'
-              ? index + 1
-              : index;
-          onInsertNew(newElement, insertionIndex);
-          return { handled: true };
+          onInsertNew(
+            newElement,
+            dropPositionRef.current === 'after' ? index + 1 : index,
+          );
+          return;
         }
 
-        if (!editableRef.current || !imageDropPoint) return;
+        const insertion = imageDropPointRef.current;
+        if (!editableRef.current || !insertion) return;
         const image = createEmbeddedImage(newElement);
-        insertAtContentBoundary(image, imageDropPoint.insertionIndex);
+        insertAtContentBoundary(image, insertion.insertionIndex);
         saveContent();
         onSelect();
         requestAnimationFrame(() => positionEmbeddedImage(image));
+        imageDropPointRef.current = null;
         setImageDropPoint(null);
-        return { handled: true };
+        return;
       }
 
-      if (
-        !item.elementId
-        || item.sourceParentId === undefined
-        || item.sourceColumnIndex === undefined
-        || item.sourceIndex === undefined
-      ) return;
-      if (item.elementId === element.id) return { handled: true };
-
-      const insertionIndex =
-        (item.dropPosition ?? dropPosition) === 'after'
-          ? index + 1
-          : index;
-      onMove(item as ColumnElementDragItem, insertionIndex);
-      return { handled: true };
+      onMove(
+        payload,
+        dropPositionRef.current === 'after' ? index + 1 : index,
+      );
     },
-    collect: (monitor) => ({
-      isOverTarget:
-        monitor.isOver({ shallow: true })
-        && monitor.getItemType() === COLUMN_ELEMENT_DRAG_TYPE,
-      isOverImageTarget:
-        monitor.isOver({ shallow: true })
-        && monitor.getItemType() === 'new-element'
-        && monitor.getItem()?.elementType === 'image',
-      isOverEmbeddedTarget:
-        monitor.isOver({ shallow: true })
-        && monitor.getItemType() === embeddedDragType,
-      isOverNewElementTarget:
-        monitor.isOver({ shallow: true })
-        && monitor.getItemType() === 'new-element'
-        && !(
-          monitor.getItem()?.elementType === 'image'
-          && (element.type === 'text' || element.type === 'wysiwyg')
-        ),
-    }),
+    onLeave: () => {
+      setEmbeddedDropY(null);
+      imageDropPointRef.current = null;
+      setImageDropPoint(null);
+    },
   });
 
-  preview(drop(elementRef));
+  const activePayload = dropTarget.payload;
 
   return {
-    ...dropState,
-    drag,
-    embeddedDrag,
+    isOverTarget:
+      dropTarget.isOver
+      && (
+        activePayload?.kind === 'root-element'
+        || activePayload?.kind === 'column-element'
+      ),
+    isOverImageTarget:
+      dropTarget.isOver
+      && activePayload?.kind === 'sidebar-element'
+      && activePayload.elementType === 'image',
+    isOverEmbeddedTarget:
+      dropTarget.isOver && activePayload?.kind === 'embedded-image',
+    isOverNewElementTarget:
+      dropTarget.isOver
+      && activePayload?.kind === 'sidebar-element'
+      && !(
+        activePayload.elementType === 'image'
+        && (element.type === 'text' || element.type === 'wysiwyg')
+      ),
+    drag: elementDragSource.dragHandleRef,
+    embeddedDrag: embeddedImageDragSource.dragHandleRef,
+    dropTargetRef: dropTarget.dropTargetRef,
     dropPosition,
     embeddedDropY,
     imageDropPoint,
-    isDragging,
+    isDragging: elementDragSource.isDragging,
   };
 }

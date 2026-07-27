@@ -2,6 +2,7 @@ import { Image as ImageIcon } from 'lucide-react';
 import type { ColumnElementContentProps } from '../../types/editor';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { Calendar } from '../ui/calendar';
+import { ContainerElementContent } from './ContainerElementContent';
 import {
   getEditorElementStyle,
   getFlexAlignment,
@@ -9,17 +10,20 @@ import {
 
 export function ColumnElementContent({
   element,
+  selectedElement,
+  hoveredElement,
   editableRef,
   isEditing,
-  onDoubleClick,
+  onClick,
   onInput,
   onBlur,
-  onEmbeddedImageClick,
+  onSelectElement,
+  onUpdate,
+  onMoveElementToColumn,
 }: ColumnElementContentProps) {
   const style = getEditorElementStyle(element, 14);
   const editableClassName = [
     'outline-none transition-all',
-    element.type === 'wysiwyg' ? 'min-h-[60px]' : '',
     isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : 'cursor-text',
   ].filter(Boolean).join(' ');
 
@@ -33,12 +37,9 @@ export function ColumnElementContent({
         ref={editableRef}
         contentEditable={isEditing}
         suppressContentEditableWarning
-        onDoubleClick={onDoubleClick}
+        onClick={onClick}
         onInput={onInput}
         onBlur={onBlur}
-        onClick={
-          element.type === 'heading' ? undefined : onEmbeddedImageClick
-        }
         style={style}
         className={editableClassName}
       />
@@ -62,6 +63,7 @@ export function ColumnElementContent({
           <ImageWithFallback
             src={element.properties.imageUrl}
             alt="Content"
+            draggable={false}
             className="max-w-full rounded-lg object-cover"
             style={{
               width:
@@ -76,7 +78,10 @@ export function ColumnElementContent({
           <div className="flex aspect-video w-full max-w-sm flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-900/60">
             <ImageIcon className="size-7" />
             <p className="mt-2 text-xs font-medium">
-              Choose an image in Properties
+              Drop image here
+            </p>
+            <p className="mt-1 text-[11px]">
+              or choose one in Properties
             </p>
           </div>
         )}
@@ -98,6 +103,19 @@ export function ColumnElementContent({
           className="scale-90 rounded-lg border border-gray-200 shadow-sm dark:border-gray-700"
         />
       </div>
+    );
+  }
+
+  if (element.type === 'flex' || element.type === 'grid') {
+    return (
+      <ContainerElementContent
+        element={element}
+        selectedElement={selectedElement}
+        hoveredElement={hoveredElement}
+        onSelectElement={onSelectElement}
+        onUpdate={onUpdate}
+        onMoveElementToColumn={onMoveElementToColumn}
+      />
     );
   }
 

@@ -59,7 +59,7 @@ function EmptyCanvas({
       <p className="max-w-md text-gray-500">
         {isOver
           ? 'Release to add this element to your page'
-          : 'Drag layout containers from the sidebar to create your page. Double-click text to edit.'}
+          : 'Drag layout containers from the sidebar to create your page. Click text to edit.'}
       </p>
     </div>
   );

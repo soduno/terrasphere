@@ -14,6 +14,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+COPY docker/uploads.ini /usr/local/etc/php/conf.d/terrasphere-uploads.ini
 COPY docker/entrypoint.sh /usr/local/bin/terrasphere-entrypoint
 
 RUN chmod +x /usr/local/bin/terrasphere-entrypoint

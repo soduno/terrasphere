@@ -192,4 +192,31 @@ final class PageController
             ->route('terrasphere.admin.content')
             ->with('success', 'Page deleted.');
     }
+
+    public function destroyMany(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:pages,id'],
+        ]);
+        $pageIds = $validated['ids'];
+
+        DB::transaction(function () use ($pageIds): void {
+            Page::query()
+                ->whereKey($pageIds)
+                ->get()
+                ->each(function (Page $page): void {
+                    $page->delete();
+                });
+        });
+
+        $count = count($pageIds);
+
+        return redirect()
+            ->route('terrasphere.admin.content')
+            ->with(
+                'success',
+                $count === 1 ? 'Page deleted.' : "{$count} pages deleted."
+            );
+    }
 }

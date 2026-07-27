@@ -136,6 +136,16 @@ export function createEditorElement(
     properties: {
       ...baseElement.properties,
       columnCount: columnCount || 2,
+      columnProperties: Array.from(
+        { length: columnCount || 2 },
+        () => ({
+          padding: '12',
+          paddingLinked: true,
+          margin: '0',
+          marginLinked: true,
+          verticalAlign: 'top' as const,
+        }),
+      ),
     },
   };
 }

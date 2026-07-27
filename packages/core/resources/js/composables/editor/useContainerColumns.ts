@@ -1,8 +1,9 @@
 import type {
-  ColumnElementDragItem,
+  EditorElementDragItem,
   EditorElement,
   UseContainerColumnsOptions,
 } from '../../types/editor';
+import { cloneEditorElement } from './elementTree';
 
 function columnChildIndexes(
   children: EditorElement[],
@@ -51,11 +52,7 @@ export function useContainerColumns({
     if (childIndex < 0) return;
 
     const source = children[childIndex];
-    children.splice(childIndex + 1, 0, {
-      ...source,
-      id: `col-element-${Date.now()}-${Math.random()}`,
-      properties: { ...source.properties },
-    });
+    children.splice(childIndex + 1, 0, cloneEditorElement(source));
     updateChildren(children);
   };
 
@@ -67,7 +64,7 @@ export function useContainerColumns({
 
   const moveChild = (
     columnIndex: number,
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     insertionIndex: number,
   ) => {
     onMoveElementToColumn(

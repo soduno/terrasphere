@@ -1,8 +1,7 @@
-import { LoaderCircle, UploadCloud } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import type { EditorCanvasFeedbackProps } from '../../types/editor';
 
 export function EditorCanvasFeedback({
-  isFileDragging,
   isUploadingImages,
   imageUploadError,
   showError,
@@ -10,18 +9,6 @@ export function EditorCanvasFeedback({
 }: EditorCanvasFeedbackProps) {
   return (
     <>
-      {isFileDragging && (
-        <div className="pointer-events-none absolute inset-4 z-[100] flex items-center justify-center rounded-2xl border-2 border-dashed border-indigo-500 bg-indigo-50/75 backdrop-blur-[2px] dark:border-indigo-400 dark:bg-indigo-950/30">
-          <div className="text-center text-indigo-700 dark:text-indigo-300">
-            <UploadCloud className="mx-auto size-8" />
-            <p className="mt-3 text-sm font-semibold">Drop images here</p>
-            <p className="mt-1 text-xs text-indigo-600/70 dark:text-indigo-300/70">
-              They will also be added to Media Library
-            </p>
-          </div>
-        </div>
-      )}
-
       {isUploadingImages && (
         <div className="pointer-events-none absolute left-1/2 top-5 z-[100] flex -translate-x-1/2 items-center gap-2 rounded-full border border-indigo-200 bg-white/95 px-4 py-2 text-sm font-medium text-indigo-700 shadow-lg backdrop-blur dark:border-indigo-800 dark:bg-gray-900/95 dark:text-indigo-300">
           <LoaderCircle className="size-4 animate-spin" />

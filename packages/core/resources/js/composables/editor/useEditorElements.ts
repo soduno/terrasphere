@@ -10,7 +10,8 @@ import {
   moveElementBetweenColumns,
 } from './elementTree';
 import type {
-  ColumnElementDragItem,
+  DropPosition,
+  EditorElementDragItem,
   EditorElement,
 } from '../../types/editor';
 
@@ -22,14 +23,48 @@ export function useEditorElements(initialElements: EditorElement[]) {
     setElements((currentElements) => [...currentElements, element]);
   };
 
-  const insertImages = (urls: string[], targetElementId: string | null) => {
+  const insertImages = (
+    urls: string[],
+    targetElementId: string | null,
+    position: DropPosition = 'after',
+  ) => {
+    const targetElement = findEditorElement(elements, targetElementId);
     const imageElements = createUploadedImageElements(urls);
+
+    if (targetElement?.type === 'image' && urls[0]) {
+      setElements((currentElements) => {
+        const currentTarget =
+          findEditorElement(currentElements, targetElement.id) ?? targetElement;
+        const nextElements = updateEditorElement(
+          currentElements,
+          targetElement.id,
+          {
+            properties: {
+              ...currentTarget.properties,
+              imageUrl: urls[0],
+            },
+          },
+        );
+
+        return imageElements.length > 1
+          ? insertUploadedImages(
+              nextElements,
+              imageElements.slice(1),
+              targetElement.id,
+              'after',
+            )
+          : nextElements;
+      });
+      setSelectedElementId(targetElement.id);
+      return;
+    }
 
     setElements((currentElements) =>
       insertUploadedImages(
         currentElements,
         imageElements,
         targetElementId,
+        position,
       )
     );
     setSelectedElementId(imageElements.at(-1)?.id ?? null);
@@ -48,14 +83,17 @@ export function useEditorElements(initialElements: EditorElement[]) {
     setSelectedElementId((currentId) => currentId === id ? null : currentId);
   };
 
-  const moveElement = (dragIndex: number, insertionIndex: number) => {
+  const moveElement = (
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => {
     setElements((currentElements) =>
-      moveEditorElement(currentElements, dragIndex, insertionIndex)
+      moveEditorElement(currentElements, item, insertionIndex)
     );
   };
 
   const moveElementToColumn = (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,

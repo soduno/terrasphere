@@ -24,25 +24,31 @@ export function DraggableElement({
   const {
     editableRef,
     isEditing,
-    handleDoubleClick,
+    handleClick,
     handleInput,
     handleBlur,
   } = useInlineElementEditing({ element, onUpdate });
   const {
     elementRef,
     drag,
+    dropTargetRef,
     dropPosition,
     isDragging,
     isOverTarget,
   } = useElementReordering({
+    elementId: element.id,
     index,
     onMove,
   });
 
   return (
     <motion.div
-      ref={elementRef}
+      ref={(node) => {
+        elementRef.current = node;
+        dropTargetRef(node);
+      }}
       data-editor-element-id={element.id}
+      data-editor-element-type={element.type}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
@@ -93,7 +99,7 @@ export function DraggableElement({
       )}
 
       <div
-        className={`${isEditing ? 'relative z-30' : ''} flex min-h-full flex-col`}
+        className={`${isEditing ? 'relative z-30' : ''} flex flex-col`}
         style={{
           justifyContent: getVerticalAlignment(
             element.properties.verticalAlign,
@@ -106,7 +112,7 @@ export function DraggableElement({
           hoveredElement={hoveredElement}
           editableRef={editableRef}
           isEditing={isEditing}
-          onDoubleClick={handleDoubleClick}
+          onClick={handleClick}
           onInput={handleInput}
           onBlur={handleBlur}
           onSelectElement={onSelectElement}
@@ -114,15 +120,6 @@ export function DraggableElement({
           onMoveElementToColumn={onMoveElementToColumn}
         />
       </div>
-
-      {(element.type === 'text' || element.type === 'heading' || element.type === 'wysiwyg') && 
-       isHovered && 
-       !isEditing && 
-       !isSelected && (
-        <div className="absolute top-2 right-2 px-2 py-1 bg-gray-900/80 text-white text-xs rounded-md z-20 animate-in fade-in duration-200">
-          Double-click to edit
-        </div>
-      )}
     </motion.div>
   );
 }

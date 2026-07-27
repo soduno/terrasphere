@@ -58,10 +58,14 @@ export function ColumnElement({
   isLast,
   isSelected,
   isHovered,
+  selectedElement,
+  hoveredElement,
   showToolbar,
   onSelect,
+  onSelectElement,
   onUpdate,
   onMove,
+  onMoveElementToColumn,
   onInsertNew,
   onDuplicate,
   onDelete,
@@ -97,7 +101,10 @@ export function ColumnElement({
 
   return (
     <motion.div
-      ref={elementRef}
+      ref={(node) => {
+        elementRef.current = node;
+        dragState.dropTargetRef(node);
+      }}
       layout="position"
       layoutId={`editor-element-${element.id}`}
       animate={{
@@ -116,13 +123,14 @@ export function ColumnElement({
       }}
       className={`group relative ${embeddedImages.image ? 'z-30' : ''}`}
       data-editor-element-id={element.id}
+      data-editor-element-type={element.type}
       onClick={(event) => {
         event.stopPropagation();
         onSelect();
       }}
       style={{
         display: floatDirection === 'none' ? 'flex' : 'flow-root',
-        flex: floatDirection === 'none' ? '1 1 0%' : undefined,
+        flex: floatDirection === 'none' ? '0 0 auto' : undefined,
         flexDirection: floatDirection === 'none' ? 'column' : undefined,
         float: floatDirection === 'none' ? undefined : floatDirection,
         width:
@@ -203,7 +211,7 @@ export function ColumnElement({
       )}
 
       <div
-        className={`${editing.isEditing ? 'relative z-20' : ''} flex flex-1 flex-col rounded-lg`}
+        className={`${editing.isEditing ? 'relative z-20' : ''} flex flex-col rounded-lg`}
         style={{
           justifyContent: getVerticalAlignment(
             element.properties.verticalAlign,
@@ -212,24 +220,29 @@ export function ColumnElement({
       >
         <ColumnElementContent
           element={element}
+          selectedElement={selectedElement}
+          hoveredElement={hoveredElement}
           editableRef={editing.editableRef}
           isEditing={editing.isEditing}
-          onDoubleClick={editing.handleDoubleClick}
+          onClick={(event) => {
+            const clickedEmbeddedImage = (
+              event.target as Element
+            ).closest('img[data-editor-embedded-image]');
+
+            if (clickedEmbeddedImage) {
+              embeddedImages.handleImageClick(event);
+              return;
+            }
+
+            editing.handleClick(event);
+          }}
           onInput={editing.handleInput}
           onBlur={editing.handleBlur}
-          onEmbeddedImageClick={embeddedImages.handleImageClick}
+          onSelectElement={onSelectElement}
+          onUpdate={onUpdate}
+          onMoveElementToColumn={onMoveElementToColumn}
         />
       </div>
-
-      {(element.type === 'text'
-        || element.type === 'heading'
-        || element.type === 'wysiwyg')
-        && isHovered
-        && !editing.isEditing && (
-        <div className="absolute left-1 top-1 z-10 rounded bg-gray-900/70 px-1.5 py-0.5 text-[10px] text-white">
-          Double-click
-        </div>
-      )}
     </motion.div>
   );
 }

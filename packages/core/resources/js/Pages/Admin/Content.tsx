@@ -12,6 +12,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { Button } from '@ui/button';
+import { Checkbox } from '@ui/checkbox';
 import { Input } from '@ui/input';
 import {
   AlertDialog,
@@ -46,13 +47,46 @@ interface ContentProps {
 export default function Content({ pages }: ContentProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewPageModal, setShowNewPageModal] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<PageSummary | null>(null);
-  const [deletingPageId, setDeletingPageId] = useState<number | null>(null);
+  const [selectedPageIds, setSelectedPageIds] =
+    useState<Set<number>>(() => new Set());
+  const [deleteTargets, setDeleteTargets] = useState<PageSummary[]>([]);
+  const [deletingPageIds, setDeletingPageIds] =
+    useState<Set<number>>(() => new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const filteredPages = pages.filter((page) =>
     page.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredPageIds = filteredPages.map((page) => page.id);
+  const allFilteredPagesSelected =
+    filteredPageIds.length > 0
+    && filteredPageIds.every((id) => selectedPageIds.has(id));
+  const someFilteredPagesSelected =
+    filteredPageIds.some((id) => selectedPageIds.has(id));
+
+  const togglePageSelection = (pageId: number, selected: boolean) => {
+    setSelectedPageIds((current) => {
+      const next = new Set(current);
+      if (selected) next.add(pageId);
+      else next.delete(pageId);
+      return next;
+    });
+  };
+
+  const toggleFilteredPages = (selected: boolean) => {
+    setSelectedPageIds((current) => {
+      const next = new Set(current);
+      filteredPageIds.forEach((id) => {
+        if (selected) next.add(id);
+        else next.delete(id);
+      });
+      return next;
+    });
+  };
+
+  const selectedPages = pages.filter((page) =>
+    selectedPageIds.has(page.id)
   );
 
   const handleEdit = (page: PageSummary) => {
@@ -68,31 +102,52 @@ export default function Content({ pages }: ContentProps) {
   };
 
   const handleDelete = () => {
-    if (!deleteTarget || isDeleting) {
+    if (deleteTargets.length === 0 || isDeleting) {
       return;
     }
 
-    const page = deleteTarget;
+    const targets = deleteTargets;
+    const targetIds = targets.map((page) => page.id);
 
     setDeleteError(null);
-    setDeleteTarget(null);
-    setDeletingPageId(page.id);
+    setDeleteTargets([]);
+    setDeletingPageIds(new Set(targetIds));
     setIsDeleting(true);
 
     window.setTimeout(() => {
-      api.delete(`/admin/pages/${page.id}`, {
-        inertia: true,
+      const options = {
         preserveScroll: true,
-        onError: (errors) => {
+        onSuccess: () => {
+          setSelectedPageIds((current) => {
+            const next = new Set(current);
+            targetIds.forEach((id) => next.delete(id));
+            return next;
+          });
+        },
+        onError: (errors: Record<string, string>) => {
           const message = Object.values(errors)[0];
 
-          setDeleteError(typeof message === 'string' ? message : 'The page could not be deleted.');
-          setDeleteTarget(page);
+          setDeleteError(typeof message === 'string' ? message : 'The pages could not be deleted.');
+          setDeleteTargets(targets);
         },
         onFinish: () => {
-          setDeletingPageId(null);
+          setDeletingPageIds(new Set());
           setIsDeleting(false);
         },
+      };
+
+      if (targetIds.length === 1) {
+        api.delete(`/admin/pages/${targetIds[0]}`, {
+          inertia: true,
+          ...options,
+        });
+        return;
+      }
+
+      router.visit('/admin/pages', {
+        method: 'delete',
+        data: { ids: targetIds },
+        ...options,
       });
     }, 450);
   };
@@ -125,12 +180,60 @@ export default function Content({ pages }: ContentProps) {
               className="pl-12 h-12 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl focus-visible:ring-indigo-500"
             />
           </div>
+          {selectedPageIds.size > 0 && (
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 dark:border-indigo-900 dark:bg-indigo-950/30">
+              <span className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                {selectedPageIds.size} {selectedPageIds.size === 1 ? 'page' : 'pages'} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isDeleting}
+                  onClick={() => setSelectedPageIds(new Set())}
+                >
+                  Clear selection
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={isDeleting || selectedPages.length === 0}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteTargets(selectedPages);
+                  }}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete selected
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
               <tr>
+                <th className="w-14 px-6 py-4 text-left">
+                  <Checkbox
+                    aria-label="Select all visible pages"
+                    checked={
+                      allFilteredPagesSelected
+                        ? true
+                        : someFilteredPagesSelected
+                          ? 'indeterminate'
+                          : false
+                    }
+                    disabled={filteredPages.length === 0 || isDeleting}
+                    onCheckedChange={(checked) =>
+                      toggleFilteredPages(checked === true)
+                    }
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Title
                 </th>
@@ -168,11 +271,27 @@ export default function Content({ pages }: ContentProps) {
                     }
                   }}
                   className={`cursor-pointer transition-[background-color,opacity] duration-200 focus:outline-none ${
-                    deletingPageId === page.id
+                    deletingPageIds.has(page.id)
                       ? 'animate-pulse bg-red-100/80 opacity-40 dark:bg-red-950/60'
-                      : 'hover:bg-indigo-50/40 focus:bg-indigo-50/40 dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5'
+                      : selectedPageIds.has(page.id)
+                        ? 'bg-indigo-50/80 hover:bg-indigo-100/70 dark:bg-indigo-950/35 dark:hover:bg-indigo-950/50'
+                        : 'hover:bg-indigo-50/40 focus:bg-indigo-50/40 dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5'
                   }`}
                 >
+                  <td
+                    className="w-14 px-6 py-5"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Checkbox
+                      aria-label={`Select ${page.title}`}
+                      checked={selectedPageIds.has(page.id)}
+                      disabled={isDeleting}
+                      onCheckedChange={(checked) =>
+                        togglePageSelection(page.id, checked === true)
+                      }
+                    />
+                  </td>
                   <td className="px-6 py-5">
                     <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
                   </td>
@@ -234,7 +353,7 @@ export default function Content({ pages }: ContentProps) {
                           disabled={isDeleting}
                           onClick={() => {
                             setDeleteError(null);
-                            setDeleteTarget(page);
+                            setDeleteTargets([page]);
                           }}
                           className="dark:hover:bg-red-950/50"
                         >
@@ -252,19 +371,26 @@ export default function Content({ pages }: ContentProps) {
       </div>
 
       <AlertDialog
-        open={deleteTarget !== null}
+        open={deleteTargets.length > 0}
         onOpenChange={(open) => {
           if (!open && !isDeleting) {
-            setDeleteTarget(null);
+            setDeleteTargets([]);
             setDeleteError(null);
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{deleteTarget?.title}”?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteTargets.length === 1
+                ? `Delete “${deleteTargets[0]?.title}”?`
+                : `Delete ${deleteTargets.length} pages?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes the page and its content. This action cannot be undone.
+              {deleteTargets.length === 1
+                ? 'This permanently deletes the page and its content.'
+                : 'This permanently deletes the selected pages and all of their content.'}
+              {' '}This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -281,7 +407,7 @@ export default function Content({ pages }: ContentProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-              Delete page
+              {deleteTargets.length === 1 ? 'Delete page' : 'Delete pages'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

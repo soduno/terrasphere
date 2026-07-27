@@ -1,11 +1,14 @@
+import { useRef, useState } from 'react';
 import {
   AlignCenter,
   AlignLeft,
   AlignRight,
   ChevronDown,
   ChevronUp,
+  LoaderCircle,
   Images,
   Minus,
+  Upload,
   type LucideIcon,
 } from 'lucide-react';
 import type {
@@ -85,9 +88,15 @@ const floatChoices = [
 
 export function EditorPropertySections({
   element,
+  selectedGridColumnIndex,
+  selectedGridColumnProperties,
+  onSelectedGridColumnPropertiesChange,
   onPropertyChange,
   onPropertiesChange,
   onChooseImage,
+  onUploadImage,
+  isUploadingImage,
+  imageUploadError,
   sortableSectionProps,
 }: EditorPropertySectionsProps) {
   const { properties } = element;
@@ -101,6 +110,71 @@ export function EditorPropertySections({
     ?? (isText ? properties.textAlign : undefined)
     ?? (element.type === 'image' ? properties.imageAlign : undefined)
     ?? (element.type === 'calendar' ? 'center' : 'left');
+
+  if (
+    element.type === 'grid'
+    && selectedGridColumnIndex !== undefined
+    && selectedGridColumnProperties
+    && onSelectedGridColumnPropertiesChange
+  ) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="order-[-1]">
+          <Label className="mb-2 text-xs uppercase text-gray-500 dark:text-gray-400">
+            Selected
+          </Label>
+          <div className="mt-2 rounded-lg bg-indigo-50 px-3 py-2 ring-1 ring-inset ring-indigo-100 dark:bg-indigo-500/10 dark:ring-indigo-500/20">
+            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
+              Grid column {selectedGridColumnIndex + 1}
+            </p>
+            <p className="mt-0.5 text-[11px] text-indigo-600/80 dark:text-indigo-300/70">
+              Settings apply only to this column
+            </p>
+          </div>
+        </div>
+
+        <PropertySection
+          title="Spacing"
+          defaultOpen
+          {...sortableSectionProps('spacing')}
+        >
+          <div className="space-y-4">
+            <SpacingControl
+              kind="padding"
+              properties={selectedGridColumnProperties}
+              defaultValue={12}
+              onChange={onSelectedGridColumnPropertiesChange}
+            />
+            <SpacingControl
+              kind="margin"
+              properties={selectedGridColumnProperties}
+              defaultValue={0}
+              onChange={onSelectedGridColumnPropertiesChange}
+            />
+          </div>
+        </PropertySection>
+
+        <PropertySection
+          title="Alignment"
+          defaultOpen
+          {...sortableSectionProps('vertical-alignment')}
+        >
+          <div className="space-y-3">
+            <ChoiceControl
+              value={selectedGridColumnProperties.verticalAlign ?? 'top'}
+              choices={verticalChoices}
+              onChange={(verticalAlign) =>
+                onSelectedGridColumnPropertiesChange({ verticalAlign })
+              }
+            />
+            <p className="text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+              Position the content vertically inside this grid column.
+            </p>
+          </div>
+        </PropertySection>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -259,6 +333,9 @@ export function EditorPropertySections({
         <ImageSection
           properties={properties}
           onChooseImage={onChooseImage}
+          onUploadImage={onUploadImage}
+          isUploadingImage={isUploadingImage}
+          imageUploadError={imageUploadError}
           onPropertyChange={onPropertyChange}
           sectionProps={sortableSectionProps('image')}
         />
@@ -284,6 +361,9 @@ export function EditorPropertySections({
 type ImageSectionProps = {
   properties: EditorElementProperties;
   onChooseImage: () => void;
+  onUploadImage?: (files: File[]) => Promise<void>;
+  isUploadingImage?: boolean;
+  imageUploadError?: string | null;
   onPropertyChange: EditorPropertySectionsProps['onPropertyChange'];
   sectionProps: ReturnType<
     EditorPropertySectionsProps['sortableSectionProps']
@@ -293,17 +373,59 @@ type ImageSectionProps = {
 function ImageSection({
   properties,
   onChooseImage,
+  onUploadImage,
+  isUploadingImage = false,
+  imageUploadError,
   onPropertyChange,
   sectionProps,
 }: ImageSectionProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   const height = !properties.imageHeight || properties.imageHeight === 'auto'
     ? 0
     : Number.parseInt(properties.imageHeight, 10);
+  const uploadFiles = async (files: FileList | File[]) => {
+    if (!onUploadImage || isUploadingImage) return;
+
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
+    );
+    if (imageFiles.length === 0) return;
+
+    await onUploadImage([imageFiles[0]]);
+  };
 
   return (
     <PropertySection title="Image" defaultOpen {...sectionProps}>
       <div className="space-y-3">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+        <div
+          className={`overflow-hidden rounded-xl border bg-gray-50 transition-colors dark:bg-gray-800 ${
+            isDraggingImage
+              ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-500 dark:bg-indigo-950/40'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          onDragEnter={(event) => {
+            if (!onUploadImage) return;
+            event.preventDefault();
+            setIsDraggingImage(true);
+          }}
+          onDragOver={(event) => {
+            if (!onUploadImage) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={(event) => {
+            if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+            setIsDraggingImage(false);
+          }}
+          onDrop={(event) => {
+            if (!onUploadImage) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setIsDraggingImage(false);
+            void uploadFiles(event.dataTransfer.files);
+          }}
+        >
           {properties.imageUrl ? (
             <img
               src={properties.imageUrl}
@@ -312,20 +434,64 @@ function ImageSection({
             />
           ) : (
             <div className="flex aspect-video flex-col items-center justify-center text-gray-400">
-              <Images className="size-6" />
-              <span className="mt-2 text-xs">No image selected</span>
+              {isUploadingImage ? (
+                <LoaderCircle className="size-6 animate-spin" />
+              ) : (
+                <Upload className="size-6" />
+              )}
+              <span className="mt-2 text-sm font-medium text-gray-600 dark:text-gray-300">
+                {isUploadingImage ? 'Uploading image…' : 'Drop image here'}
+              </span>
+              <span className="mt-1 text-xs">No image selected</span>
             </div>
           )}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onChooseImage}
-          className="w-full gap-2 rounded-lg border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-gray-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-        >
-          <Images className="size-4" />
-          {properties.imageUrl ? 'Replace from Media' : 'Choose from Media'}
-        </Button>
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onChooseImage}
+            className="w-full gap-2 rounded-lg border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-gray-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+          >
+            <Images className="size-4" />
+            {properties.imageUrl ? 'Replace from Media' : 'Choose from Media'}
+          </Button>
+          {onUploadImage && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  if (event.target.files) {
+                    void uploadFiles(event.target.files);
+                  }
+                  event.target.value = '';
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUploadingImage}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full gap-2 rounded-lg"
+              >
+                {isUploadingImage ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Upload className="size-4" />
+                )}
+                Upload from computer
+              </Button>
+            </>
+          )}
+        </div>
+        {imageUploadError && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            {imageUploadError}
+          </p>
+        )}
         <Separator className="bg-gray-100 dark:bg-gray-800" />
         <div className="space-y-4">
           <Label className="text-xs uppercase text-gray-500 dark:text-gray-400">

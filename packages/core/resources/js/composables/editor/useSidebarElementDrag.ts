@@ -1,8 +1,5 @@
-import { useDrag } from 'react-dnd';
-import type {
-  NewEditorElementDragItem,
-  UseSidebarElementDragOptions,
-} from '../../types/editor';
+import { useGravitySource } from '../../components/editor/terra-gravity/TerraGravity';
+import type { UseSidebarElementDragOptions } from '../../types/editor';
 
 export function useSidebarElementDrag({
   element,
@@ -10,20 +7,20 @@ export function useSidebarElementDrag({
   canDrag,
 }: UseSidebarElementDragOptions) {
   const isLayout = element.type === 'flex' || element.type === 'grid';
-  const [{ isDragging }, drag] = useDrag<
-    NewEditorElementDragItem,
-    void,
-    { isDragging: boolean }
-  >({
-    type: 'new-element',
-    item: () => ({
+  const dragSource = useGravitySource({
+    payload: {
+      kind: 'sidebar-element',
       elementType: element.type,
       createElement: (columnCount) => onCreate(element.type, columnCount),
       isLayout,
-    }),
-    canDrag: () => canDrag,
-    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    },
+    disabled: !canDrag,
+    previewLabel: `Add ${element.label}`,
   });
 
-  return { drag, isDragging, isLayout };
+  return {
+    drag: dragSource.dragHandleRef,
+    isDragging: dragSource.isDragging,
+    isLayout,
+  };
 }

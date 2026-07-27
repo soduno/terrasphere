@@ -1,53 +1,101 @@
-import { useDrop } from 'react-dnd';
+import { useRef, useState } from 'react';
+import { useGravityTarget } from '../../components/editor/terra-gravity/TerraGravity';
 import { useTransientFlag } from '../useTransientFlag';
-import {
-  COLUMN_ELEMENT_DRAG_TYPE,
-  type ColumnElementDragItem,
-  type NewEditorElementDragItem,
-  type UseColumnDropZoneOptions,
+import type {
+  EditorDragPayload,
+  UseColumnDropZoneOptions,
 } from '../../types/editor';
 
-type ColumnDropItem = NewEditorElementDragItem | ColumnElementDragItem;
+type ColumnDropPayload = Extract<
+  EditorDragPayload,
+  { kind: 'sidebar-element' | 'root-element' | 'column-element' }
+>;
 
 export function useColumnDropZone({
+  parentId,
   elementCount,
+  emptyIndicatorTop = 12,
   onAddToColumn,
   onMoveElement,
 }: UseColumnDropZoneOptions) {
   const droppedFeedback = useTransientFlag();
-  const [{ isOver, canDrop }, drop] = useDrop<
-    ColumnDropItem,
-    { handled: true } | void,
-    { isOver: boolean; canDrop: boolean }
-  >({
-    accept: ['new-element', COLUMN_ELEMENT_DRAG_TYPE],
-    canDrop: (item) =>
-      'elementId' in item || !item.isLayout,
-    drop: (item, monitor) => {
-      if (monitor.didDrop()) return { handled: true };
+  const insertionIndexRef = useRef(0);
+  const [indicatorTop, setIndicatorTop] = useState(emptyIndicatorTop);
+  const dropTarget = useGravityTarget<ColumnDropPayload>({
+    accepts: (payload): payload is ColumnDropPayload =>
+      payload.kind === 'sidebar-element'
+      || (
+        (payload.kind === 'root-element' || payload.kind === 'column-element')
+        && payload.elementId !== parentId
+      ),
+    onMove: ({ point, rect, target }) => {
+      const itemContainer = target.querySelector<HTMLElement>(
+        ':scope > [data-editor-column-items]',
+      );
+      const itemElements = itemContainer
+        ? Array.from(itemContainer.children).filter(
+            (child): child is HTMLElement =>
+              child instanceof HTMLElement
+              && child.dataset.editorElementId !== undefined,
+          )
+        : [];
 
-      if (monitor.getItemType() === COLUMN_ELEMENT_DRAG_TYPE) {
-        onMoveElement(item as ColumnElementDragItem, elementCount);
+      if (itemElements.length === 0) {
+        insertionIndexRef.current = 0;
+        setIndicatorTop(emptyIndicatorTop);
+        return;
+      }
+
+      const boundaries = [
+        itemElements[0].getBoundingClientRect().top,
+        ...itemElements.map((item) => item.getBoundingClientRect().bottom),
+      ];
+      let nearestBoundaryIndex = 0;
+
+      boundaries.forEach((boundary, index) => {
+        if (
+          Math.abs(point.y - boundary)
+          < Math.abs(point.y - boundaries[nearestBoundaryIndex])
+        ) {
+          nearestBoundaryIndex = index;
+        }
+      });
+
+      insertionIndexRef.current = nearestBoundaryIndex;
+      setIndicatorTop(
+        Math.max(
+          0,
+          Math.min(
+            boundaries[nearestBoundaryIndex] - rect.top,
+            rect.height,
+          ),
+        ),
+      );
+    },
+    onDrop: ({ payload }) => {
+      if (
+        payload.kind === 'root-element'
+        || payload.kind === 'column-element'
+      ) {
+        onMoveElement(payload, insertionIndexRef.current);
       } else {
-        const newElement =
-          (item as NewEditorElementDragItem).createElement();
-        newElement.id = `col-element-${Date.now()}-${Math.random()}`;
-        onAddToColumn(newElement);
+        const newElement = payload.createElement();
+        onAddToColumn(newElement, insertionIndexRef.current);
       }
 
       droppedFeedback.trigger();
-      return { handled: true };
     },
-    collect: (monitor) => ({
-      isOver: monitor.isOver({ shallow: true }),
-      canDrop: monitor.canDrop(),
-    }),
+    onLeave: () => {
+      insertionIndexRef.current = elementCount === 0 ? 0 : elementCount;
+      setIndicatorTop(emptyIndicatorTop);
+    },
   });
 
   return {
-    canDrop,
-    drop,
-    isOver,
+    canDrop: dropTarget.isOver,
+    drop: dropTarget.dropTargetRef,
+    isOver: dropTarget.isOver,
+    indicatorTop,
     justDropped: droppedFeedback.isActive,
   };
 }

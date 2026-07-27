@@ -19,6 +19,23 @@ export type ElementType =
 
 export type DropPosition = 'before' | 'after';
 export type ElementAlignment = 'left' | 'center' | 'right';
+export type VerticalAlignment = 'top' | 'center' | 'bottom';
+
+export interface EditorGridColumnProperties {
+  padding?: string;
+  paddingTop?: string;
+  paddingRight?: string;
+  paddingBottom?: string;
+  paddingLeft?: string;
+  paddingLinked?: boolean;
+  margin?: string;
+  marginTop?: string;
+  marginRight?: string;
+  marginBottom?: string;
+  marginLeft?: string;
+  marginLinked?: boolean;
+  verticalAlign?: VerticalAlignment;
+}
 
 export const PROPERTY_SECTION_IDS = [
   'spacing',
@@ -57,7 +74,10 @@ export interface EditorElementProperties {
   imageHeight?: string;
   imageAlign?: ElementAlignment;
   contentAlign?: ElementAlignment;
-  verticalAlign?: 'top' | 'center' | 'bottom';
+  verticalAlign?: VerticalAlignment;
+  columnProperties?: EditorGridColumnProperties[];
+  /** @deprecated Kept as a read fallback for grids saved before column properties. */
+  columnVerticalAlignments?: VerticalAlignment[];
   width?: string;
   columnGap?: string;
   columnCount?: number;
@@ -72,29 +92,16 @@ export interface EditorElement {
   columnIndex?: number;
 }
 
-export interface ElementDragItem {
-  index: number;
-  dropPosition?: DropPosition;
+export interface EditorElementDragItem {
+  elementId: string;
+  sourceParentId: string | null;
+  sourceColumnIndex: number | null;
+  sourceIndex: number;
 }
 
-export interface ColumnElementDragItem {
-  elementId: string;
+export interface ColumnElementDragItem extends EditorElementDragItem {
   sourceParentId: string;
   sourceColumnIndex: number;
-  sourceIndex: number;
-  dropPosition?: DropPosition;
-}
-
-export interface ColumnDropItem {
-  elementId?: string;
-  sourceParentId?: string;
-  sourceColumnIndex?: number;
-  sourceIndex?: number;
-  dropPosition?: DropPosition;
-  elementType?: ElementType;
-  createElement?: () => EditorElement;
-  embeddedImageId?: string;
-  isLayout?: boolean;
 }
 
 export interface EmbeddedImageOverlay {
@@ -109,11 +116,31 @@ export interface EmbeddedImageOverlay {
   float: 'none' | 'left' | 'right';
 }
 
-export interface NewEditorElementDragItem {
-  createElement: (columnCount?: number) => EditorElement;
-  elementType?: ElementType;
-  isLayout?: boolean;
-}
+export type EditorDragPayload =
+  | {
+      kind: 'sidebar-element';
+      elementType: ElementType;
+      createElement: (columnCount?: number) => EditorElement;
+      isLayout: boolean;
+    }
+  | ({
+      kind: 'root-element';
+      sourceParentId: null;
+      sourceColumnIndex: null;
+    } & EditorElementDragItem)
+  | ({
+      kind: 'column-element';
+    } & ColumnElementDragItem)
+  | {
+      kind: 'embedded-image';
+      ownerElementId: string;
+      embeddedImageId: string;
+    }
+  | {
+      kind: 'property-section';
+      id: PropertySectionId;
+      index: number;
+    };
 
 export interface EditorCanvasProps {
   elements: EditorElement[];
@@ -122,9 +149,12 @@ export interface EditorCanvasProps {
   updateElement: (id: string, updates: Partial<EditorElement>) => void;
   deleteElement: (id: string) => void;
   duplicateElement: (id: string) => void;
-  moveElement: (dragIndex: number, hoverIndex: number) => void;
+  moveElement: (
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => void;
   moveElementToColumn: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,
@@ -134,6 +164,7 @@ export interface EditorCanvasProps {
   onDropImageFiles?: (
     files: File[],
     targetElementId: string | null,
+    position?: DropPosition,
   ) => Promise<void>;
   isUploadingImages?: boolean;
   imageUploadError?: string | null;
@@ -158,9 +189,12 @@ export interface EditorCanvasContentProps {
   updateElement: (id: string, updates: Partial<EditorElement>) => void;
   deleteElement: (id: string) => void;
   duplicateElement: (id: string) => void;
-  moveElement: (dragIndex: number, hoverIndex: number) => void;
+  moveElement: (
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => void;
   moveElementToColumn: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,
@@ -178,9 +212,12 @@ export interface DraggableElementProps {
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
-  onMove: (dragIndex: number, hoverIndex: number) => void;
+  onMove: (
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => void;
   onMoveElementToColumn: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,
@@ -193,13 +230,13 @@ export interface EditorElementContentProps {
   hoveredElement: string | null;
   editableRef: RefObject<HTMLDivElement | null>;
   isEditing: boolean;
-  onDoubleClick: MouseEventHandler<HTMLDivElement>;
+  onClick: MouseEventHandler<HTMLDivElement>;
   onInput: FormEventHandler<HTMLDivElement>;
   onBlur: FocusEventHandler<HTMLDivElement>;
   onSelectElement: (id: string) => void;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onMoveElementToColumn: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,
@@ -217,11 +254,19 @@ export interface ColumnDropZoneProps {
   onAddToColumn: (element: EditorElement, insertionIndex?: number) => void;
   onDuplicateFromColumn: (childId: string) => void;
   onMoveElement: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => void;
+  onMoveElementToColumn: (
+    item: EditorElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
     insertionIndex: number,
   ) => void;
   onDeleteFromColumn: (childId: string) => void;
   elementGap?: string;
+  matchRowHeight?: boolean;
+  columnProperties?: EditorGridColumnProperties;
 }
 
 export interface ColumnElementProps {
@@ -236,7 +281,16 @@ export interface ColumnElementProps {
   showToolbar: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
-  onMove: (item: ColumnElementDragItem, insertionIndex: number) => void;
+  selectedElement: string | null;
+  hoveredElement: string | null;
+  onSelectElement: (id: string) => void;
+  onMove: (item: EditorElementDragItem, insertionIndex: number) => void;
+  onMoveElementToColumn: (
+    item: EditorElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => void;
   onInsertNew: (element: EditorElement, insertionIndex: number) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -244,12 +298,35 @@ export interface ColumnElementProps {
 
 export interface ColumnElementContentProps {
   element: EditorElement;
+  selectedElement: string | null;
+  hoveredElement: string | null;
   editableRef: RefObject<HTMLDivElement | null>;
   isEditing: boolean;
-  onDoubleClick: MouseEventHandler<HTMLDivElement>;
+  onClick: MouseEventHandler<HTMLDivElement>;
   onInput: FormEventHandler<HTMLDivElement>;
   onBlur: FocusEventHandler<HTMLDivElement>;
-  onEmbeddedImageClick: MouseEventHandler<HTMLDivElement>;
+  onSelectElement: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<EditorElement>) => void;
+  onMoveElementToColumn: (
+    item: EditorElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => void;
+}
+
+export interface ContainerElementContentProps {
+  element: EditorElement;
+  selectedElement: string | null;
+  hoveredElement: string | null;
+  onSelectElement: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<EditorElement>) => void;
+  onMoveElementToColumn: (
+    item: EditorElementDragItem,
+    targetParentId: string,
+    targetColumnIndex: number,
+    insertionIndex: number,
+  ) => void;
 }
 
 export interface EmbeddedImageControlsProps {
@@ -275,6 +352,9 @@ export interface ElementToolbarProps {
 export interface EditorPropertiesProps {
   element?: EditorElement;
   updateElement: (id: string, updates: Partial<EditorElement>) => void;
+  onUploadImages?: (files: File[]) => Promise<string[] | null>;
+  isUploadingImages?: boolean;
+  imageUploadError?: string | null;
   sectionOrder?: PropertySectionId[];
   onSectionOrderChange?: (order: PropertySectionId[]) => void;
 }
@@ -305,9 +385,17 @@ export type EditorPropertyChange = <
 
 export interface EditorPropertySectionsProps {
   element: EditorElement;
+  selectedGridColumnIndex?: number;
+  selectedGridColumnProperties?: EditorGridColumnProperties;
+  onSelectedGridColumnPropertiesChange?: (
+    updates: Partial<EditorGridColumnProperties>,
+  ) => void;
   onPropertyChange: EditorPropertyChange;
   onPropertiesChange: (updates: Partial<EditorElementProperties>) => void;
   onChooseImage: () => void;
+  onUploadImage?: (files: File[]) => Promise<void>;
+  isUploadingImage?: boolean;
+  imageUploadError?: string | null;
   sortableSectionProps: (
     sectionId: PropertySectionId,
   ) => Omit<PropertySectionProps, 'title' | 'children'>;
@@ -406,19 +494,24 @@ export interface UseEditorCanvasInteractionsOptions {
   onDropImageFiles: (
     files: File[],
     targetElementId: string | null,
+    position?: DropPosition,
   ) => Promise<void>;
 }
 
 export interface UseElementReorderingOptions {
+  elementId: string;
   index: number;
-  onMove: (dragIndex: number, insertionIndex: number) => void;
+  onMove: (
+    item: EditorElementDragItem,
+    insertionIndex: number,
+  ) => void;
 }
 
 export interface UseContainerColumnsOptions {
   element: EditorElement;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onMoveElementToColumn: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     targetParentId: string,
     targetColumnIndex: number,
     insertionIndex: number,
@@ -443,16 +536,18 @@ export interface UseColumnElementDragDropOptions {
   setDraftContent: (content: string) => void;
   onUpdate: (id: string, updates: Partial<EditorElement>) => void;
   onSelect: () => void;
-  onMove: (item: ColumnElementDragItem, insertionIndex: number) => void;
+  onMove: (item: EditorElementDragItem, insertionIndex: number) => void;
   onInsertNew: (element: EditorElement, insertionIndex: number) => void;
   positionEmbeddedImage: (image: HTMLImageElement) => void;
 }
 
 export interface UseColumnDropZoneOptions {
+  parentId: string;
   elementCount: number;
+  emptyIndicatorTop?: number;
   onAddToColumn: (element: EditorElement, insertionIndex?: number) => void;
   onMoveElement: (
-    item: ColumnElementDragItem,
+    item: EditorElementDragItem,
     insertionIndex: number,
   ) => void;
 }
@@ -461,8 +556,6 @@ export interface TreeInsertionResult {
   nodes: EditorElement[];
   inserted: boolean;
 }
-
-export const COLUMN_ELEMENT_DRAG_TYPE = 'column-element';
 
 export const DEFAULT_PROPERTIES = {
   padding: '0',

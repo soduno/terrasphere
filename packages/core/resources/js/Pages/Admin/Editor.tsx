@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useEffect, useState } from 'react';
 import { EditorSidebar } from '@components/editor/EditorSidebar';
 import { EditorCanvas } from '@components/editor/EditorCanvas';
 import { EditorToolbar } from '@components/editor/EditorToolbar';
+import { TerraGravityProvider } from '@components/editor/terra-gravity/TerraGravity';
+import { GridColumnSelectionProvider } from '@components/editor/GridColumnSelection';
 import {
   EditorProperties,
   normalizePropertySectionOrder,
@@ -43,11 +43,34 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
     upload: uploadImages,
   } = useEditorImageUpload();
 
-  const uploadDroppedImages = async (files: File[], targetElementId: string | null) => {
+  useEffect(() => {
+    const preventFileNavigation = (event: DragEvent) => {
+      if (
+        Array.from(event.dataTransfer?.types ?? [])
+          .some((type) => type.toLowerCase() === 'files')
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('dragover', preventFileNavigation, true);
+    window.addEventListener('drop', preventFileNavigation, true);
+
+    return () => {
+      window.removeEventListener('dragover', preventFileNavigation, true);
+      window.removeEventListener('drop', preventFileNavigation, true);
+    };
+  }, []);
+
+  const uploadDroppedImages = async (
+    files: File[],
+    targetElementId: string | null,
+    position?: 'before' | 'after',
+  ) => {
     const urls = await uploadImages(files);
     if (!urls) return;
 
-    editor.insertImages(urls, targetElementId);
+    editor.insertImages(urls, targetElementId, position);
   };
 
   const addGridElement = (columnCount: number) => {
@@ -64,6 +87,13 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
         borderRadius: '0',
         columnGap: '20',
         columnCount,
+        columnProperties: Array.from({ length: columnCount }, () => ({
+          padding: '12',
+          paddingLinked: true,
+          margin: '0',
+          marginLinked: true,
+          verticalAlign: 'top' as const,
+        })),
       },
       children: [],
     };
@@ -72,8 +102,9 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
   };
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div
+    <TerraGravityProvider>
+      <GridColumnSelectionProvider>
+        <div
         className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950"
         onDragOverCapture={(event) => {
           if (
@@ -118,15 +149,18 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
           <EditorProperties
             element={editor.selectedElement}
             updateElement={editor.updateElement}
+            onUploadImages={uploadImages}
+            isUploadingImages={isUploadingImages}
+            imageUploadError={imageUploadError}
             sectionOrder={propertyOrder.order}
             onSectionOrderChange={propertyOrder.updateOrder}
           />
         </div>
-      </div>
+        </div>
 
-      {/* Grid Column Count Modal */}
-      {showGridModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
+        {/* Grid Column Count Modal */}
+        {showGridModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
             <h2 className="text-2xl text-gray-900 dark:text-white mb-2">Grid Container</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
@@ -151,8 +185,9 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
               Cancel
             </button>
           </div>
-        </div>
-      )}
-    </DndProvider>
+          </div>
+        )}
+      </GridColumnSelectionProvider>
+    </TerraGravityProvider>
   );
 }

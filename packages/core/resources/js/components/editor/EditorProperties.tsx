@@ -8,10 +8,12 @@ import {
 } from '../../composables/editor/usePropertySectionOrder';
 import {
   PROPERTY_SECTION_IDS,
+  type EditorGridColumnProperties,
   type EditorPropertiesProps,
   type PropertySectionId,
 } from '../../types/editor';
 import { EditorPropertySections } from './properties/EditorPropertySections';
+import { useGridColumnSelection } from './GridColumnSelection';
 
 export { PROPERTY_SECTION_IDS, normalizePropertySectionOrder };
 export type { PropertySectionId };
@@ -52,9 +54,13 @@ function EmptyProperties() {
 export function EditorProperties({
   element,
   updateElement,
+  onUploadImages,
+  isUploadingImages = false,
+  imageUploadError = null,
   sectionOrder = [...PROPERTY_SECTION_IDS],
   onSectionOrderChange = () => undefined,
 }: EditorPropertiesProps) {
+  const gridColumnSelection = useGridColumnSelection();
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const sectionSorting = usePropertySectionOrder(
     sectionOrder,
@@ -64,6 +70,48 @@ export function EditorProperties({
   if (!element) return <EmptyProperties />;
 
   const propertyUpdates = createEditorPropertyUpdates(element, updateElement);
+  const selectedGridColumnIndex =
+    gridColumnSelection.selection?.containerId === element.id
+      ? gridColumnSelection.selection.columnIndex
+      : undefined;
+  const selectedGridColumnProperties =
+    selectedGridColumnIndex === undefined
+      ? undefined
+      : {
+          padding: '12',
+          paddingLinked: true,
+          margin: '0',
+          marginLinked: true,
+          verticalAlign:
+            element.properties.columnVerticalAlignments?.[
+              selectedGridColumnIndex
+            ] ?? 'top',
+          ...element.properties.columnProperties?.[selectedGridColumnIndex],
+        };
+  const updateSelectedGridColumnProperties = (
+    updates: Partial<EditorGridColumnProperties>,
+  ) => {
+    if (selectedGridColumnIndex === undefined) return;
+
+    const columnProperties = [
+      ...(element.properties.columnProperties ?? []),
+    ];
+    columnProperties[selectedGridColumnIndex] = {
+      ...selectedGridColumnProperties,
+      ...updates,
+    };
+    propertyUpdates.updateProperty('columnProperties', columnProperties);
+  };
+  const handleImageUpload = onUploadImages
+    ? async (files: File[]) => {
+        const urls = await onUploadImages(files);
+        const imageUrl = urls?.[0];
+
+        if (imageUrl) {
+          propertyUpdates.updateProperty('imageUrl', imageUrl);
+        }
+      }
+    : undefined;
 
   return (
     <>
@@ -72,9 +120,17 @@ export function EditorProperties({
           <PropertiesHeader />
           <EditorPropertySections
             element={element}
+            selectedGridColumnIndex={selectedGridColumnIndex}
+            selectedGridColumnProperties={selectedGridColumnProperties}
+            onSelectedGridColumnPropertiesChange={
+              updateSelectedGridColumnProperties
+            }
             onPropertyChange={propertyUpdates.updateProperty}
             onPropertiesChange={propertyUpdates.updateProperties}
             onChooseImage={() => setShowMediaPicker(true)}
+            onUploadImage={handleImageUpload}
+            isUploadingImage={isUploadingImages}
+            imageUploadError={imageUploadError}
             sortableSectionProps={sectionSorting.sortableSectionProps}
           />
         </div>

@@ -24,6 +24,7 @@ export function useInlineElementEditing({
 }: UseInlineElementEditingOptions) {
   const editableRef = useRef<HTMLDivElement>(null);
   const draftContentRef = useRef<string | null>(null);
+  const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null);
   const contentRenderedCallbackRef = useRef(onContentRendered);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -41,14 +42,19 @@ export function useInlineElementEditing({
     onUpdate(element.id, { content });
   };
 
-  const handleDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     if (
       element.type !== 'text'
       && element.type !== 'heading'
       && element.type !== 'wysiwyg'
     ) return;
 
-    event.stopPropagation();
+    if (isEditing) return;
+
+    pendingCaretPointRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    };
     setDraftContent(event.currentTarget.innerHTML);
     setIsEditing(true);
   };
@@ -65,15 +71,56 @@ export function useInlineElementEditing({
   };
 
   useLayoutEffect(() => {
-    if (isEditing || !editableRef.current) return;
+    const editable = editableRef.current;
+    if (!editable) return;
+
+    if (isEditing) {
+      editable.focus({ preventScroll: true });
+
+      const point = pendingCaretPointRef.current;
+      const selection = window.getSelection();
+      const documentWithCaret = document as Document & {
+        caretPositionFromPoint?: (
+          x: number,
+          y: number,
+        ) => { offsetNode: Node; offset: number } | null;
+        caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      };
+      let range = point
+        ? documentWithCaret.caretRangeFromPoint?.(point.x, point.y) ?? null
+        : null;
+
+      if (!range && point) {
+        const caret = documentWithCaret.caretPositionFromPoint?.(
+          point.x,
+          point.y,
+        );
+        if (caret) {
+          range = document.createRange();
+          range.setStart(caret.offsetNode, caret.offset);
+          range.collapse(true);
+        }
+      }
+
+      if (!range || !editable.contains(range.startContainer)) {
+        range = document.createRange();
+        range.selectNodeContents(editable);
+        range.collapse(false);
+      }
+
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      pendingCaretPointRef.current = null;
+      return;
+    }
 
     const content = element.content || defaultElementContent(element);
 
-    if (editableRef.current.innerHTML !== content) {
-      editableRef.current.innerHTML = content;
+    if (editable.innerHTML !== content) {
+      editable.innerHTML = content;
     }
 
-    contentRenderedCallbackRef.current?.(editableRef.current);
+    contentRenderedCallbackRef.current?.(editable);
   }, [element.content, element.type, isEditing]);
 
   return {
@@ -81,7 +128,7 @@ export function useInlineElementEditing({
     isEditing,
     setDraftContent,
     saveCurrentContent,
-    handleDoubleClick,
+    handleClick,
     handleInput,
     handleBlur,
   };

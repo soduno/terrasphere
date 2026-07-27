@@ -1,12 +1,13 @@
 import type {
-  ColumnElementDragItem,
+  DropPosition,
+  EditorElementDragItem,
   EditorElement,
   TreeInsertionResult,
 } from '../../types/editor';
 
 export function moveElementBetweenColumns(
   elements: EditorElement[],
-  item: ColumnElementDragItem,
+  item: EditorElementDragItem,
   targetParentId: string,
   targetColumnIndex: number,
   insertionIndex: number,
@@ -14,32 +15,25 @@ export function moveElementBetweenColumns(
   let movedElement: EditorElement | undefined;
 
   const removeElement = (nodes: EditorElement[]): EditorElement[] =>
-    nodes.map((node) => {
-      const directChildIndex = node.children?.findIndex(
-        (child) => child.id === item.elementId
-      ) ?? -1;
-
-      if (directChildIndex >= 0 && node.children) {
-        movedElement = node.children[directChildIndex];
-        return {
-          ...node,
-          children: node.children.filter(
-            (_, index) => index !== directChildIndex,
-          ),
-        };
+    nodes.flatMap((node) => {
+      if (!movedElement && node.id === item.elementId) {
+        movedElement = node;
+        return [];
       }
 
-      if (!node.children?.length) return node;
+      if (!node.children?.length) return [node];
 
       const children = removeElement(node.children);
-      return children === node.children ? node : { ...node, children };
+      return [{ ...node, children }];
     });
 
   const withoutElement = removeElement(elements);
   if (!movedElement) return elements;
 
   const adjustedInsertionIndex =
-    item.sourceParentId === targetParentId
+    item.sourceParentId !== null
+    && item.sourceColumnIndex !== null
+    && item.sourceParentId === targetParentId
     && item.sourceColumnIndex === targetColumnIndex
     && item.sourceIndex < insertionIndex
       ? insertionIndex - 1
@@ -138,19 +132,45 @@ export function deleteEditorElement(
 
 export function moveEditorElement(
   elements: EditorElement[],
-  dragIndex: number,
+  item: EditorElementDragItem,
   insertionIndex: number,
 ): EditorElement[] {
-  const nextElements = [...elements];
-  const [draggedElement] = nextElements.splice(dragIndex, 1);
-  if (!draggedElement) return elements;
+  let movedElement: EditorElement | undefined;
+  const removeElement = (nodes: EditorElement[]): EditorElement[] =>
+    nodes.flatMap((node) => {
+      if (!movedElement && node.id === item.elementId) {
+        movedElement = node;
+        return [];
+      }
 
-  const adjustedIndex = dragIndex < insertionIndex
+      if (!node.children?.length) return [node];
+      return [{ ...node, children: removeElement(node.children) }];
+    });
+  const nextElements = removeElement(elements);
+  if (!movedElement) return elements;
+
+  const adjustedIndex =
+    item.sourceParentId === null && item.sourceIndex < insertionIndex
     ? insertionIndex - 1
     : insertionIndex;
-  nextElements.splice(adjustedIndex, 0, draggedElement);
+  nextElements.splice(
+    Math.max(0, Math.min(adjustedIndex, nextElements.length)),
+    0,
+    { ...movedElement, columnIndex: undefined },
+  );
 
   return nextElements;
+}
+
+export function cloneEditorElement(
+  element: EditorElement,
+): EditorElement {
+  return {
+    ...element,
+    id: `element-${Date.now()}-${Math.random()}`,
+    properties: { ...element.properties },
+    children: element.children?.map(cloneEditorElement),
+  };
 }
 
 export function duplicateEditorElement(
@@ -160,8 +180,7 @@ export function duplicateEditorElement(
   const index = elements.findIndex((element) => element.id === id);
   if (index < 0) return elements;
 
-  const clone = structuredClone(elements[index]);
-  clone.id = `element-${Date.now()}`;
+  const clone = cloneEditorElement(elements[index]);
 
   const nextElements = [...elements];
   nextElements.splice(index + 1, 0, clone);
@@ -188,6 +207,7 @@ export function insertUploadedImages(
   elements: EditorElement[],
   imageElements: EditorElement[],
   targetElementId: string | null,
+  position: DropPosition = 'after',
 ): EditorElement[] {
   const insertNearTarget = (nodes: EditorElement[]): TreeInsertionResult => {
     let inserted = false;
@@ -202,7 +222,9 @@ export function insertUploadedImages(
         inserted = true;
         return {
           ...node,
-          children: [...(node.children || []), ...imageElements],
+          children: position === 'before'
+            ? [...imageElements, ...(node.children || [])]
+            : [...(node.children || []), ...imageElements],
         };
       }
 
@@ -214,15 +236,18 @@ export function insertUploadedImages(
         const targetColumn = node.children[targetChildIndex].columnIndex ?? 0;
         inserted = true;
 
+        const insertionIndex =
+          targetChildIndex + (position === 'after' ? 1 : 0);
+
         return {
           ...node,
           children: [
-            ...node.children.slice(0, targetChildIndex + 1),
+            ...node.children.slice(0, insertionIndex),
             ...imageElements.map((image) => ({
               ...image,
               columnIndex: targetColumn,
             })),
-            ...node.children.slice(targetChildIndex + 1),
+            ...node.children.slice(insertionIndex),
           ],
         };
       }
