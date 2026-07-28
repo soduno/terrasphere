@@ -3,8 +3,6 @@ import { router } from '@inertiajs/react';
 import { api } from '@adapter/api';
 import {
   Plus,
-  Search,
-  MoreVertical,
   Edit,
   Trash2,
   Copy,
@@ -12,8 +10,6 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { Button } from '@ui/button';
-import { Checkbox } from '@ui/checkbox';
-import { Input } from '@ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@ui/dropdown-menu';
+import { DropdownMenuItem } from '@ui/dropdown-menu';
+import { DataTable, type DataTableColumn } from '@components/DataTable';
 import { NewPageModal } from './NewPageModal';
 
 interface PageSummary {
@@ -40,54 +32,24 @@ interface PageSummary {
   updatedAt: string | null;
 }
 
-interface ContentProps {
-  pages: PageSummary[];
+interface FieldSetSummary {
+  id: number;
+  name: string;
+  fieldCount: number;
 }
 
-export default function Content({ pages }: ContentProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+interface ContentProps {
+  pages: PageSummary[];
+  fieldSets: FieldSetSummary[];
+  filter: string;
+}
+
+export default function Content({ pages, fieldSets, filter }: ContentProps) {
   const [showNewPageModal, setShowNewPageModal] = useState(false);
-  const [selectedPageIds, setSelectedPageIds] =
-    useState<Set<number>>(() => new Set());
-  const [deleteTargets, setDeleteTargets] = useState<PageSummary[]>([]);
-  const [deletingPageIds, setDeletingPageIds] =
-    useState<Set<number>>(() => new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<number>>(() => new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const filteredPages = pages.filter((page) =>
-    page.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredPageIds = filteredPages.map((page) => page.id);
-  const allFilteredPagesSelected =
-    filteredPageIds.length > 0
-    && filteredPageIds.every((id) => selectedPageIds.has(id));
-  const someFilteredPagesSelected =
-    filteredPageIds.some((id) => selectedPageIds.has(id));
-
-  const togglePageSelection = (pageId: number, selected: boolean) => {
-    setSelectedPageIds((current) => {
-      const next = new Set(current);
-      if (selected) next.add(pageId);
-      else next.delete(pageId);
-      return next;
-    });
-  };
-
-  const toggleFilteredPages = (selected: boolean) => {
-    setSelectedPageIds((current) => {
-      const next = new Set(current);
-      filteredPageIds.forEach((id) => {
-        if (selected) next.add(id);
-        else next.delete(id);
-      });
-      return next;
-    });
-  };
-
-  const selectedPages = pages.filter((page) =>
-    selectedPageIds.has(page.id)
-  );
+  const [singleDeleteTarget, setSingleDeleteTarget] = useState<PageSummary | null>(null);
 
   const handleEdit = (page: PageSummary) => {
     if (page.type === 'wysiwyg') {
@@ -101,37 +63,22 @@ export default function Content({ pages }: ContentProps) {
     router.visit(`/admin/fields-builder/${page.id}`);
   };
 
-  const handleDelete = () => {
-    if (deleteTargets.length === 0 || isDeleting) {
-      return;
-    }
-
-    const targets = deleteTargets;
-    const targetIds = targets.map((page) => page.id);
+  const handleDelete = (targets: PageSummary[]) => {
+    const targetIds = targets.map((p) => p.id);
 
     setDeleteError(null);
-    setDeleteTargets([]);
-    setDeletingPageIds(new Set(targetIds));
+    setDeletingIds(new Set(targetIds));
     setIsDeleting(true);
 
     window.setTimeout(() => {
       const options = {
         preserveScroll: true,
-        onSuccess: () => {
-          setSelectedPageIds((current) => {
-            const next = new Set(current);
-            targetIds.forEach((id) => next.delete(id));
-            return next;
-          });
-        },
         onError: (errors: Record<string, string>) => {
           const message = Object.values(errors)[0];
-
           setDeleteError(typeof message === 'string' ? message : 'The pages could not be deleted.');
-          setDeleteTargets(targets);
         },
         onFinish: () => {
-          setDeletingPageIds(new Set());
+          setDeletingIds(new Set());
           setIsDeleting(false);
         },
       };
@@ -152,268 +99,196 @@ export default function Content({ pages }: ContentProps) {
     }, 450);
   };
 
-  return (
-    <div className="p-10">
-      <div className="flex items-center justify-between mb-10">
-        <div>
-          <h1 className="text-gray-900 dark:text-white mb-2">Content</h1>
-          <p className="text-gray-500 dark:text-gray-400">Manage all your pages and content.</p>
-        </div>
-        <Button
-          onClick={() => setShowNewPageModal(true)}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20"
+  const confirmSingleDelete = () => {
+    if (!singleDeleteTarget) return;
+    handleDelete([singleDeleteTarget]);
+    setSingleDeleteTarget(null);
+  };
+
+  const columns: DataTableColumn<PageSummary>[] = [
+    {
+      key: 'title',
+      header: 'Title',
+      render: (page) => (
+        <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (page) => (
+        <span
+          className={`px-3 py-1.5 text-xs rounded-full ${
+            page.type === 'wysiwyg'
+              ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400'
+              : 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          New Page
-        </Button>
-      </div>
+          {page.type === 'wysiwyg' ? 'WYSIWYG' : 'Custom Fields'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (page) => (
+        <span
+          className={`px-3 py-1.5 text-xs rounded-full ${
+            page.status === 'published'
+              ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+          }`}
+        >
+          {page.status.charAt(0).toUpperCase() + page.status.slice(1)}
+        </span>
+      ),
+    },
+    {
+      key: 'author',
+      header: 'Author',
+      render: () => <span className="text-sm text-gray-700 dark:text-gray-300">&mdash;</span>,
+    },
+    {
+      key: 'date',
+      header: 'Date',
+      render: (page) => (
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : '\u2014'}
+        </span>
+      ),
+    },
+    {
+      key: 'views',
+      header: 'Views',
+      render: () => <span className="text-sm text-gray-700 dark:text-gray-300">&mdash;</span>,
+    },
+  ];
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border-0 dark:border dark:border-gray-800 shadow-sm">
-        <div className="p-6 border-b border-gray-100 dark:border-gray-800">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
-            <Input
-              type="text"
-              placeholder="Search pages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 h-12 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl focus-visible:ring-indigo-500"
-            />
-          </div>
-          {selectedPageIds.size > 0 && (
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 dark:border-indigo-900 dark:bg-indigo-950/30">
-              <span className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
-                {selectedPageIds.size} {selectedPageIds.size === 1 ? 'page' : 'pages'} selected
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isDeleting}
-                  onClick={() => setSelectedPageIds(new Set())}
-                >
-                  Clear selection
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  disabled={isDeleting || selectedPages.length === 0}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setDeleteTargets(selectedPages);
-                  }}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete selected
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+  const tabs = [
+    { key: 'all', label: 'All' },
+    { key: 'wysiwyg', label: 'Visual' },
+    { key: 'custom_fields', label: 'Custom Fields' },
+  ] as const;
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-              <tr>
-                <th className="w-14 px-6 py-4 text-left">
-                  <Checkbox
-                    aria-label="Select all visible pages"
-                    checked={
-                      allFilteredPagesSelected
-                        ? true
-                        : someFilteredPagesSelected
-                          ? 'indeterminate'
-                          : false
-                    }
-                    disabled={filteredPages.length === 0 || isDeleting}
-                    onCheckedChange={(checked) =>
-                      toggleFilteredPages(checked === true)
-                    }
-                  />
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Author
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Views
-                </th>
-                <th className="px-6 py-4 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {filteredPages.map((page) => (
-                <tr
-                  key={page.id}
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => handleEdit(page)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleEdit(page);
-                    }
-                  }}
-                  className={`cursor-pointer transition-[background-color,opacity] duration-200 focus:outline-none ${
-                    deletingPageIds.has(page.id)
-                      ? 'animate-pulse bg-red-100/80 opacity-40 dark:bg-red-950/60'
-                      : selectedPageIds.has(page.id)
-                        ? 'bg-indigo-50/80 hover:bg-indigo-100/70 dark:bg-indigo-950/35 dark:hover:bg-indigo-950/50'
-                        : 'hover:bg-indigo-50/40 focus:bg-indigo-50/40 dark:hover:bg-indigo-500/5 dark:focus:bg-indigo-500/5'
-                  }`}
-                >
-                  <td
-                    className="w-14 px-6 py-5"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    <Checkbox
-                      aria-label={`Select ${page.title}`}
-                      checked={selectedPageIds.has(page.id)}
-                      disabled={isDeleting}
-                      onCheckedChange={(checked) =>
-                        togglePageSelection(page.id, checked === true)
-                      }
-                    />
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <span
-                      className={`px-3 py-1.5 text-xs rounded-full ${
-                        page.type === 'wysiwyg'
-                          ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400'
-                          : 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400'
-                      }`}
-                    >
-                      {page.type === 'wysiwyg' ? 'WYSIWYG' : 'Custom Fields'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5">
-                    <span
-                      className={`px-3 py-1.5 text-xs rounded-full ${
-                        page.status === 'published'
-                          ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                      }`}
-                    >
-                      {page.status.charAt(0).toUpperCase() + page.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">—</td>
-                  <td className="px-6 py-5 text-sm text-gray-500 dark:text-gray-400">
-                    {page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="px-6 py-5 text-sm text-gray-700 dark:text-gray-300">—</td>
-                  <td
-                    className="px-6 py-5"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 dark:hover:bg-gray-800">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800">
-                        <DropdownMenuItem onClick={() => handleEdit(page)} className="dark:hover:bg-gray-700">
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        {page.type === 'custom_fields' && (
-                          <DropdownMenuItem onClick={() => handleEditFields(page)} className="dark:hover:bg-gray-700">
-                            <Settings2 className="w-4 h-4 mr-2" />
-                            Edit Fields
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem className="dark:hover:bg-gray-700">
-                          <Copy className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          disabled={isDeleting}
-                          onClick={() => {
-                            setDeleteError(null);
-                            setDeleteTargets([page]);
-                          }}
-                          className="dark:hover:bg-red-950/50"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  return (
+    <>
+      <DataTable
+        items={pages}
+        itemKey={(page) => page.id}
+        columns={columns}
+        searchPlaceholder="Search pages..."
+        searchFilter={(page, query) =>
+          page.title.toLowerCase().includes(query.toLowerCase())
+        }
+        title="Content"
+        description="Manage all your pages and content."
+        headerAction={
+          <Button
+            onClick={() => setShowNewPageModal(true)}
+            className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20"
+          >
+            <Plus className="w-4 h-4" />
+            New Page
+          </Button>
+        }
+        onRowClick={handleEdit}
+        onDelete={handleDelete}
+        deletingIds={deletingIds}
+        isDeleting={isDeleting}
+        deleteError={deleteError}
+        onClearDelete={() => setDeleteError(null)}
+        deleteConfirmTitle={(targets) =>
+          targets.length === 1
+            ? `Delete "\u201c${targets[0]?.title}\u201d"?`
+            : `Delete ${targets.length} pages?`
+        }
+        deleteConfirmDescription={(targets) =>
+          targets.length === 1
+            ? 'This permanently deletes the page and its content.'
+            : 'This permanently deletes the selected pages and all of their content.'
+        }
+        renderActions={(page) => (
+          <>
+            <DropdownMenuItem onClick={() => handleEdit(page)} className="dark:hover:bg-gray-700">
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            {page.type === 'custom_fields' && (
+              <DropdownMenuItem onClick={() => handleEditFields(page)} className="dark:hover:bg-gray-700">
+                <Settings2 className="w-4 h-4 mr-2" />
+                Edit Fields
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem className="dark:hover:bg-gray-700">
+              <Copy className="w-4 h-4 mr-2" />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteError(null);
+                setSingleDeleteTarget(page);
+              }}
+              className="dark:hover:bg-red-950/50"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </>
+        )}
+      >
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl dark:bg-gray-800 mb-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => router.visit(`/admin/content?filter=${tab.key}`, { preserveState: true, preserveScroll: true })}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                filter === tab.key
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </div>
+      </DataTable>
 
       <AlertDialog
-        open={deleteTargets.length > 0}
+        open={singleDeleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open && !isDeleting) {
-            setDeleteTargets([]);
-            setDeleteError(null);
-          }
+          if (!open && !isDeleting) setSingleDeleteTarget(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deleteTargets.length === 1
-                ? `Delete “${deleteTargets[0]?.title}”?`
-                : `Delete ${deleteTargets.length} pages?`}
+              Delete &ldquo;{singleDeleteTarget?.title}&rdquo;?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTargets.length === 1
-                ? 'This permanently deletes the page and its content.'
-                : 'This permanently deletes the selected pages and all of their content.'}
-              {' '}This action cannot be undone.
+              This permanently deletes the page and its content. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-
           {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
-
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                handleDelete();
+              onClick={(e) => {
+                e.preventDefault();
+                confirmSingleDelete();
               }}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-              {deleteTargets.length === 1 ? 'Delete page' : 'Delete pages'}
+              Delete page
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <NewPageModal open={showNewPageModal} onClose={() => setShowNewPageModal(false)} />
-    </div>
+      <NewPageModal open={showNewPageModal} onClose={() => setShowNewPageModal(false)} fieldSets={fieldSets} />
+    </>
   );
 }

@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\Route;
 use TerraSphere\Core\Http\Controllers\Admin\AuthenticationController;
 use TerraSphere\Core\Http\Controllers\Admin\DashboardController;
+use TerraSphere\Core\Http\Controllers\Admin\FieldSetController;
 use TerraSphere\Core\Http\Controllers\Admin\PageController;
+use TerraSphere\Core\Http\Controllers\Admin\ProfileController;
+use TerraSphere\Core\Http\Controllers\Admin\SettingsController;
 use TerraSphere\Core\Http\Controllers\Admin\UserSettingController;
 use TerraSphere\Core\Http\Middleware\HandleAdminInertiaRequests;
 use TerraSphere\Core\Http\Middleware\RequireAdminAuthentication;
@@ -30,12 +33,34 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
                 ->name('pages.destroy-many');
             Route::delete('/pages/{page}', [PageController::class, 'destroy'])
                 ->name('pages.destroy');
-            Route::get('/settings', fn (): Response => Inertia::render('Admin/Settings'))
+            Route::get('/settings', [SettingsController::class, 'edit'])
                 ->name('settings');
+            Route::put('/settings', [SettingsController::class, 'update'])
+                ->name('settings.update');
+            Route::get('/roles', fn (): Response => Inertia::render('Admin/Roles'))
+                ->name('roles');
+            Route::get('/field-sets', [FieldSetController::class, 'index'])
+                ->name('field-sets');
+            Route::post('/field-sets', [FieldSetController::class, 'store'])
+                ->name('field-sets.store');
+            Route::put('/field-sets/{fieldSet}', [FieldSetController::class, 'update'])
+                ->name('field-sets.update');
+            Route::delete('/field-sets/{fieldSet}', [FieldSetController::class, 'destroy'])
+                ->name('field-sets.destroy');
+            Route::delete('/field-sets', [FieldSetController::class, 'destroyMany'])
+                ->name('field-sets.destroy-many');
+            Route::get('/field-sets/{fieldSet}/fields', [FieldSetController::class, 'editFields'])
+                ->name('field-sets.fields');
+            Route::put('/field-sets/{fieldSet}/fields', [FieldSetController::class, 'saveFields'])
+                ->name('field-sets.fields.update');
+            Route::get('/menus', fn (): Response => Inertia::render('Admin/Menus'))
+                ->name('menus');
             Route::get('/extensions', fn (): Response => Inertia::render('Admin/Extensions'))
                 ->name('extensions');
-            Route::get('/profile', fn (): Response => Inertia::render('Admin/Profile'))
-                ->name('profile');
+            Route::get('/profile', [ProfileController::class, 'edit'])->name('profile');
+            Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+            Route::put('/profile/password', [ProfileController::class, 'updatePassword'])
+                ->name('profile.password.update');
             Route::get('/editor/{page}', [PageController::class, 'editWysiwyg'])->name('editor');
             Route::put('/pages/{page}/wysiwyg', [PageController::class, 'saveWysiwyg'])
                 ->name('pages.wysiwyg.update');

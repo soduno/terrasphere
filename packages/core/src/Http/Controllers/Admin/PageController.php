@@ -13,14 +13,24 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use TerraSphere\Core\Models\Page;
+use TerraSphere\Core\Models\FieldSet;
 
 final class PageController
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $filter = $request->query('filter', 'all');
+
+        $pagesQuery = Page::query()->latest('updated_at');
+
+        if ($filter === 'wysiwyg') {
+            $pagesQuery->where('content_type', 'wysiwyg');
+        } elseif ($filter === 'custom_fields') {
+            $pagesQuery->where('content_type', 'custom_fields');
+        }
+
         return Inertia::render('Admin/Content', [
-            'pages' => Page::query()
-                ->latest('updated_at')
+            'pages' => $pagesQuery
                 ->get()
                 ->map(fn (Page $page): array => [
                     'id' => $page->id,
@@ -29,6 +39,17 @@ final class PageController
                     'status' => $page->status,
                     'updatedAt' => $page->updated_at?->toISOString(),
                 ]),
+            'filter' => $filter,
+            'fieldSets' => FieldSet::query()
+                ->whereNotNull('field_schema')
+                ->whereRaw('JSON_LENGTH(field_schema) > 0')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (FieldSet $fieldSet): array => [
+                    'id' => $fieldSet->id,
+                    'name' => $fieldSet->name,
+                    'fieldCount' => count($fieldSet->field_schema ?? []),
+                ]),
         ]);
     }
 
@@ -36,19 +57,36 @@ final class PageController
     {
         $validated = $request->validate([
             'content_type' => ['required', 'in:wysiwyg,custom_fields'],
+            'field_set_id' => ['nullable', 'integer', 'exists:field_sets,id'],
         ]);
+
+        $fieldSchema = [];
+        $draftFieldValues = [];
+
+        if ($validated['content_type'] === 'custom_fields') {
+            $draftFieldValues = [];
+
+            if (isset($validated['field_set_id'])) {
+                $fieldSet = FieldSet::query()->findOrFail($validated['field_set_id']);
+                $fieldSchema = $fieldSet->field_schema ?? [];
+            }
+        }
 
         $page = Page::query()->create([
             'title' => 'Untitled Page',
             'slug' => 'untitled-page-'.Str::lower(Str::random(8)),
             'content_type' => $validated['content_type'],
             'draft_elements' => [],
-            'field_schema' => $validated['content_type'] === 'custom_fields' ? [] : null,
-            'draft_field_values' => $validated['content_type'] === 'custom_fields' ? [] : null,
+            'field_schema' => $validated['content_type'] === 'custom_fields' ? $fieldSchema : null,
+            'draft_field_values' => $validated['content_type'] === 'custom_fields' ? $draftFieldValues : null,
         ]);
 
-        return $page->content_type === 'wysiwyg'
-            ? redirect()->route('terrasphere.admin.editor', $page)
+        if ($page->content_type === 'wysiwyg') {
+            return redirect()->route('terrasphere.admin.editor', $page);
+        }
+
+        return isset($validated['field_set_id'])
+            ? redirect()->route('terrasphere.admin.fields-editor', $page)
             : redirect()->route('terrasphere.admin.fields-builder', $page);
     }
 
