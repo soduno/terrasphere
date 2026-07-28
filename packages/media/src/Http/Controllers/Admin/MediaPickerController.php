@@ -21,6 +21,10 @@ final class MediaPickerController
                         'asset' => $asset->uuid,
                         'filename' => $asset->filename,
                     ], false),
+                    'previewUrl' => route('terrasphere.media.thumbnail', [
+                        'asset' => $asset->uuid,
+                        'filename' => $asset->filename,
+                    ], false),
                     'name' => $asset->filename,
                     'width' => $asset->width,
                     'height' => $asset->height,

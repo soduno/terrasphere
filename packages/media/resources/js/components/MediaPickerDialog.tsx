@@ -13,10 +13,38 @@ import { Input } from '@ui/input';
 interface LibraryImage {
   id: number;
   url: string;
+  previewUrl: string;
   name: string;
   width: number | null;
   height: number | null;
   size: number;
+}
+
+const INITIAL_VISIBLE_IMAGES = 24;
+const MEDIA_CACHE_TTL = 15_000;
+let cachedImages: LibraryImage[] | null = null;
+let cachedAt = 0;
+let pendingImages: Promise<LibraryImage[]> | null = null;
+
+function loadLibraryImages() {
+  if (cachedImages && Date.now() - cachedAt < MEDIA_CACHE_TTL) {
+    return Promise.resolve(cachedImages);
+  }
+
+  if (!pendingImages) {
+    pendingImages = api
+      .get<{ images: LibraryImage[] }>('/admin/media-picker')
+      .then(({ images }) => {
+        cachedImages = images;
+        cachedAt = Date.now();
+        return images;
+      })
+      .finally(() => {
+        pendingImages = null;
+      });
+  }
+
+  return pendingImages;
 }
 
 interface MediaPickerDialogProps {
@@ -52,9 +80,11 @@ function PickerImage({
           <ImageOff className="size-6 text-gray-400" />
         ) : (
           <img
-            src={image.url}
+            src={image.previewUrl}
             alt=""
             loading="lazy"
+            decoding="async"
+            fetchPriority="low"
             onError={() => setFailed(true)}
             className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
           />
@@ -83,28 +113,27 @@ export function MediaPickerDialog({
 }: MediaPickerDialogProps) {
   const [images, setImages] = useState<LibraryImage[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_IMAGES);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
-    const controller = new AbortController();
     setIsLoading(true);
     setError(null);
 
-    api.get<{ images: LibraryImage[] }>('/admin/media-picker', {
-      signal: controller.signal,
-    })
-      .then((data) => setImages(data.images))
+    loadLibraryImages()
+      .then(setImages)
       .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === 'AbortError') return;
         setError(reason instanceof Error ? reason.message : 'Unable to load the media library.');
       })
       .finally(() => setIsLoading(false));
-
-    return () => controller.abort();
   }, [open]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_IMAGES);
+  }, [open, searchQuery]);
 
   const filteredImages = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
@@ -148,7 +177,7 @@ export function MediaPickerDialog({
             </div>
           ) : filteredImages.length > 0 ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {filteredImages.map((image) => (
+              {filteredImages.slice(0, visibleCount).map((image) => (
                 <PickerImage
                   key={image.id}
                   image={image}
@@ -159,6 +188,19 @@ export function MediaPickerDialog({
                   }}
                 />
               ))}
+              {visibleCount < filteredImages.length && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleCount((count) =>
+                      Math.min(count + INITIAL_VISIBLE_IMAGES, filteredImages.length)
+                    )
+                  }
+                  className="col-span-full rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-indigo-600 dark:hover:text-indigo-300"
+                >
+                  Show more images
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex h-64 flex-col items-center justify-center text-center">
