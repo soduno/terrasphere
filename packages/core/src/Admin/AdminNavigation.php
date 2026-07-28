@@ -7,14 +7,31 @@ namespace TerraSphere\Core\Admin;
 final class AdminNavigation
 {
     /**
-     * @var array<string, array{name: string, href: string, icon: string}>
+     * @var array<string, array{name: string, href: string, icon: string, children?: list<array{name: string, href: string, icon: string}>}>
      */
     private array $items = [
         'dashboard' => ['name' => 'Dashboard', 'href' => '/admin', 'icon' => 'dashboard'],
-        'content' => ['name' => 'Content', 'href' => '/admin/content', 'icon' => 'content'],
-        'settings' => ['name' => 'Settings', 'href' => '/admin/settings', 'icon' => 'settings'],
+        'content' => [
+            'name' => 'Content',
+            'href' => '/admin/content',
+            'icon' => 'content',
+            'children' => [
+                ['name' => 'Pages', 'href' => '/admin/content', 'icon' => 'overview'],
+                ['name' => 'Field Sets', 'href' => '/admin/field-sets', 'icon' => 'groups'],
+                ['name' => 'Menus', 'href' => '/admin/menus', 'icon' => 'menu'],
+            ],
+        ],
+        'settings' => [
+            'name' => 'Settings',
+            'href' => '/admin/settings',
+            'icon' => 'settings',
+            'children' => [
+                ['name' => 'System', 'href' => '/admin/settings', 'icon' => 'settings'],
+                ['name' => 'Profile', 'href' => '/admin/profile', 'icon' => 'profile'],
+                ['name' => 'Roles', 'href' => '/admin/roles', 'icon' => 'profile'],
+            ],
+        ],
         'extensions' => ['name' => 'Extensions', 'href' => '/admin/extensions', 'icon' => 'extensions'],
-        'profile' => ['name' => 'Profile', 'href' => '/admin/profile', 'icon' => 'profile'],
     ];
 
     public function add(
@@ -45,7 +62,7 @@ final class AdminNavigation
     }
 
     /**
-     * @return list<array{name: string, href: string, icon: string}>
+     * @return list<array{name: string, href: string, icon: string, children?: list<array{name: string, href: string, icon: string}>}>
      */
     public function all(): array
     {
