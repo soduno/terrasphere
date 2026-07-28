@@ -4,10 +4,15 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
         libicu-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+        libwebp-dev \
         libzip-dev \
         unzip \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install -j1 \
         bcmath \
+        gd \
         intl \
         pdo_mysql \
         zip \
