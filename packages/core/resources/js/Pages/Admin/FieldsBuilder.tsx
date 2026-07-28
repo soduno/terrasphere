@@ -66,6 +66,8 @@ interface FieldsBuilderProps {
   errors?: {
     slug?: string;
   };
+  saveUrl?: string;
+  backUrl?: string;
 }
 
 const fieldTypes = [
@@ -120,7 +122,9 @@ const normalizeSlug = (value: string) =>
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-');
 
-export default function FieldsBuilder({ page, errors = {} }: FieldsBuilderProps) {
+export default function FieldsBuilder({ page, errors = {}, saveUrl, backUrl }: FieldsBuilderProps) {
+  const defaultSaveUrl = saveUrl ?? `/admin/pages/${page.id}/field-schema`;
+  const defaultBackUrl = backUrl ?? '/admin/content';
   const [pageName, setPageName] = useState(page.title);
   const [modelSlug, setModelSlug] = useState(page.slug);
   const [rows, setRows] = useState<FieldRow[]>(page.rows);
@@ -266,7 +270,7 @@ export default function FieldsBuilder({ page, errors = {} }: FieldsBuilderProps)
 
   const handleSave = () => {
     api.put(
-      `/admin/pages/${page.id}/field-schema`,
+      defaultSaveUrl,
       {
         title: pageName,
         slug: modelSlug,
@@ -286,7 +290,7 @@ export default function FieldsBuilder({ page, errors = {} }: FieldsBuilderProps)
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.visit('/admin/content')}
+              onClick={() => router.visit(defaultBackUrl)}
               className="h-10 w-10 shrink-0 rounded-xl p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label="Back to content"
             >
