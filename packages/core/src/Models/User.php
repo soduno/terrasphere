@@ -33,6 +33,11 @@ final class User extends Authenticatable
         return ['uuid'];
     }
 
+    public function profile(): HasOne
+    {
+        return $this->hasOne(UserProfile::class);
+    }
+
     public function settings(): HasOne
     {
         return $this->hasOne(UserSetting::class);

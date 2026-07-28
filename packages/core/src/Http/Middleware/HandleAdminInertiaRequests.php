@@ -20,6 +20,7 @@ final class HandleAdminInertiaRequests extends Middleware
                 'user' => $request->user()?->only(['uuid', 'username', 'email']),
             ],
             'adminNavigation' => fn (): array => app(AdminNavigation::class)->all(),
+            'success' => fn () => $request->session()->get('success'),
         ];
     }
 }
