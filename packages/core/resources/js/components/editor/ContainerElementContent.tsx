@@ -47,12 +47,14 @@ export function ContainerElementContent({
           elementGap={
             element.type === 'flex'
               ? element.properties.columnGap
-              : undefined
+              : element.properties.columnProperties?.[columnIndex]?.gap
+                ?? '8'
           }
           matchRowHeight={element.type === 'grid'}
           columnProperties={
             element.type === 'grid'
               ? {
+                  gap: '8',
                   padding: '12',
                   paddingLinked: true,
                   margin: '0',

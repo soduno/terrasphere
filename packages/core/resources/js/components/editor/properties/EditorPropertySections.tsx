@@ -139,6 +139,22 @@ export function EditorPropertySections({
           {...sortableSectionProps('spacing')}
         >
           <div className="space-y-4">
+            <PropertyRange
+              id={`grid-column-${selectedGridColumnIndex}-gap`}
+              label="Gap"
+              value={Number.parseInt(
+                selectedGridColumnProperties.gap ?? '8',
+                10,
+              )}
+              min={0}
+              max={60}
+              step={4}
+              onChange={(value) =>
+                onSelectedGridColumnPropertiesChange({
+                  gap: value.toString(),
+                })
+              }
+            />
             <SpacingControl
               kind="padding"
               properties={selectedGridColumnProperties}

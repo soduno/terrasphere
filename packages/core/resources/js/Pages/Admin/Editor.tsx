@@ -88,6 +88,7 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
         columnGap: '20',
         columnCount,
         columnProperties: Array.from({ length: columnCount }, () => ({
+          gap: '8',
           padding: '12',
           paddingLinked: true,
           margin: '0',

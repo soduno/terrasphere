@@ -139,6 +139,7 @@ export function createEditorElement(
       columnProperties: Array.from(
         { length: columnCount || 2 },
         () => ({
+          gap: '8',
           padding: '12',
           paddingLinked: true,
           margin: '0',

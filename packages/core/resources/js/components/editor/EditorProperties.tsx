@@ -78,6 +78,7 @@ export function EditorProperties({
     selectedGridColumnIndex === undefined
       ? undefined
       : {
+          gap: '8',
           padding: '12',
           paddingLinked: true,
           margin: '0',

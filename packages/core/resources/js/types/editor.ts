@@ -22,6 +22,7 @@ export type ElementAlignment = 'left' | 'center' | 'right';
 export type VerticalAlignment = 'top' | 'center' | 'bottom';
 
 export interface EditorGridColumnProperties {
+  gap?: string;
   padding?: string;
   paddingTop?: string;
   paddingRight?: string;
