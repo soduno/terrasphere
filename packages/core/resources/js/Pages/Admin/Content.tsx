@@ -8,6 +8,8 @@ import {
   Copy,
   Settings2,
   LoaderCircle,
+  Globe,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@ui/button';
 import {
@@ -22,6 +24,7 @@ import {
 } from '@ui/alert-dialog';
 import { DropdownMenuItem } from '@ui/dropdown-menu';
 import { DataTable, type DataTableColumn } from '@components/DataTable';
+import { Tabs, TabsList, TabsTrigger } from '@ui/tabs';
 import { NewPageModal } from './NewPageModal';
 
 interface PageSummary {
@@ -61,6 +64,10 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
 
   const handleEditFields = (page: PageSummary) => {
     router.visit(`/admin/fields-builder/${page.id}`);
+  };
+
+  const handlePublish = (page: PageSummary) => {
+    api.patch(`/admin/pages/${page.id}/publish`, {}, { inertia: true });
   };
 
   const handleDelete = (targets: PageSummary[]) => {
@@ -165,8 +172,8 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
   ];
 
   const tabs = [
-    { key: 'all', label: 'All' },
-    { key: 'wysiwyg', label: 'Visual' },
+    { key: 'all', label: 'All Pages' },
+    { key: 'wysiwyg', label: 'Visual Editor' },
     { key: 'custom_fields', label: 'Custom Fields' },
   ] as const;
 
@@ -219,6 +226,11 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
                 Edit Fields
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onClick={() => handlePublish(page)} className="dark:hover:bg-gray-700">
+              {page.status === 'published'
+                ? <><FileText className="w-4 h-4 mr-2" />Unpublish</>
+                : <><Globe className="w-4 h-4 mr-2" />Publish</>}
+            </DropdownMenuItem>
             <DropdownMenuItem className="dark:hover:bg-gray-700">
               <Copy className="w-4 h-4 mr-2" />
               Duplicate
@@ -238,21 +250,15 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
           </>
         )}
       >
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl dark:bg-gray-800 mb-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => router.visit(`/admin/content?filter=${tab.key}`, { preserveState: true, preserveScroll: true })}
-              className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                filter === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={filter} onValueChange={(value) => router.visit(`/admin/content?filter=${value}`, { preserveState: true, preserveScroll: true })} className="mb-6">
+          <TabsList className="w-full max-w-md bg-gray-100 dark:bg-gray-800">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.key} value={tab.key} className="flex-1">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </DataTable>
 
       <AlertDialog

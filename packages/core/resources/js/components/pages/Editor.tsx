@@ -150,6 +150,7 @@ export function Editor() {
         <div className="h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
         <EditorToolbar
           title="Untitled Page"
+          status="draft"
           saveStatus="saved"
         />
         <div className="flex-1 flex overflow-hidden">

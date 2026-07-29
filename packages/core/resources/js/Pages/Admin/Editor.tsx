@@ -18,6 +18,7 @@ interface EditorProps {
   page: {
     id: number;
     title: string;
+    status: string;
     elements: EditorElement[];
     lockVersion: number;
     updatedAt: string | null;
@@ -124,6 +125,7 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
         <EditorToolbar
           pageId={page.id}
           title={page.title}
+          status={page.status}
           saveStatus={saveStatus}
         />
         <div className="flex-1 flex overflow-hidden">

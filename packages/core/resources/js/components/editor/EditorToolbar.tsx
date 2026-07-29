@@ -1,5 +1,6 @@
-import { ArrowLeft, Eye, LoaderCircle, Monitor, Pencil, Save, Smartphone } from 'lucide-react';
+import { ArrowLeft, Eye, Globe, LoaderCircle, Monitor, Pencil, Save, Smartphone } from 'lucide-react';
 import { router } from '@inertiajs/react';
+import { api } from '@adapter/api';
 import { useEditablePageTitle } from '../../composables/editor/useEditablePageTitle';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -9,12 +10,21 @@ import type { EditorToolbarProps } from '../../types/editor';
 export function EditorToolbar({
   pageId,
   title,
+  status,
   saveStatus,
 }: EditorToolbarProps) {
   const pageTitle = useEditablePageTitle({
     pageId,
     initialTitle: title,
   });
+
+  const isPublished = status === 'published';
+
+  const handlePublish = () => {
+    if (pageId) {
+      api.patch(`/admin/pages/${pageId}/publish`, {}, { inertia: true });
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -97,9 +107,8 @@ export function EditorToolbar({
           <Eye className="w-4 h-4" />
           Preview
         </Button>
-        <Button size="sm" className="gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20">
-          <Save className="w-4 h-4" />
-          Publish
+        <Button size="sm" onClick={handlePublish} className="gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:text-blue-300 shadow-md shadow-indigo-500/20">
+          {isPublished ? <><Save className="w-4 h-4" />Unpublish</> : <><Globe className="w-4 h-4" />Publish</>}
         </Button>
       </div>
     </div>

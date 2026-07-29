@@ -458,6 +458,7 @@ export interface UseSidebarElementDragOptions {
 export interface EditorToolbarProps {
   pageId?: number;
   title: string;
+  status: string;
   saveStatus: EditorSaveStatus;
 }
 

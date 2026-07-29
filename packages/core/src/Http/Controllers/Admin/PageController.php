@@ -99,6 +99,7 @@ final class PageController
             'page' => [
                 'id' => $page->id,
                 'title' => $page->title,
+                'status' => $page->status,
                 'elements' => $page->draft_elements ?? [],
                 'lockVersion' => $page->lock_version,
                 'updatedAt' => $page->updated_at?->toISOString(),
@@ -256,5 +257,17 @@ final class PageController
                 'success',
                 $count === 1 ? 'Page deleted.' : "{$count} pages deleted."
             );
+    }
+
+    public function publish(Page $page): RedirectResponse
+    {
+        $page->update([
+            'status' => $page->status === 'published' ? 'draft' : 'published',
+        ]);
+
+        return redirect()->back()->with(
+            'success',
+            $page->status === 'published' ? 'Page published.' : 'Page unpublished.'
+        );
     }
 }
