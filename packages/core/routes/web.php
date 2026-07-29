@@ -8,6 +8,7 @@ use Inertia\Response;
 use TerraSphere\Core\Http\Controllers\Admin\AuthenticationController;
 use TerraSphere\Core\Http\Controllers\Admin\DashboardController;
 use TerraSphere\Core\Http\Controllers\Admin\FieldSetController;
+use TerraSphere\Core\Http\Controllers\Admin\MenuController;
 use TerraSphere\Core\Http\Controllers\Admin\PageController;
 use TerraSphere\Core\Http\Controllers\Admin\ProfileController;
 use TerraSphere\Core\Http\Controllers\Admin\SettingsController;
@@ -53,8 +54,26 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
                 ->name('field-sets.fields');
             Route::put('/field-sets/{fieldSet}/fields', [FieldSetController::class, 'saveFields'])
                 ->name('field-sets.fields.update');
-            Route::get('/menus', fn (): Response => Inertia::render('Admin/Menus'))
+            Route::get('/menus', [MenuController::class, 'index'])
                 ->name('menus');
+            Route::post('/menus', [MenuController::class, 'store'])
+                ->name('menus.store');
+            Route::put('/menus/{menu}', [MenuController::class, 'update'])
+                ->name('menus.update');
+            Route::delete('/menus/{menu}', [MenuController::class, 'destroy'])
+                ->name('menus.destroy');
+            Route::delete('/menus', [MenuController::class, 'destroyMany'])
+                ->name('menus.destroy-many');
+            Route::get('/menus/{menu}/edit', [MenuController::class, 'edit'])
+                ->name('menus.edit');
+            Route::post('/menus/{menu}/items', [MenuController::class, 'addItem'])
+                ->name('menus.items.store');
+            Route::put('/items/{item}', [MenuController::class, 'updateItem'])
+                ->name('items.update');
+            Route::put('/menus/{menu}/sync', [MenuController::class, 'sync'])
+                ->name('menus.sync');
+            Route::delete('/items/{item}', [MenuController::class, 'destroyItem'])
+                ->name('items.destroy');
             Route::get('/extensions', fn (): Response => Inertia::render('Admin/Extensions'))
                 ->name('extensions');
             Route::get('/profile', [ProfileController::class, 'edit'])->name('profile');
@@ -78,5 +97,7 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
                 ->name('pages.field-values.update');
             Route::patch('/pages/{page}/title', [PageController::class, 'updateTitle'])
                 ->name('pages.title.update');
+            Route::patch('/pages/{page}/publish', [PageController::class, 'publish'])
+                ->name('pages.publish');
         });
     });
