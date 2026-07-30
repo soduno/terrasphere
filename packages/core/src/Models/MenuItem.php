@@ -17,6 +17,7 @@ final class MenuItem extends Model
         'page_id',
         'url',
         'label',
+        'html_id',
         'css_classes',
         'target',
         'order',
