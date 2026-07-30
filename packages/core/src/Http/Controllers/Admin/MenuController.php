@@ -152,6 +152,7 @@ final class MenuController
         $validated = $request->validate([
             'label' => ['required', 'string', 'max:255'],
             'url' => ['nullable', 'string', 'max:2048'],
+            'html_id' => ['nullable', 'string', 'max:255'],
             'css_classes' => ['nullable', 'string', 'max:255'],
             'target' => ['required', 'in:_self,_blank'],
         ]);
@@ -174,6 +175,7 @@ final class MenuController
             'items.*.page_id' => ['nullable', 'integer', 'exists:pages,id'],
             'items.*.url' => ['nullable', 'string', 'max:2048'],
             'items.*.label' => ['required', 'string', 'max:255'],
+            'items.*.html_id' => ['nullable', 'string', 'max:255'],
             'items.*.target' => ['required', 'in:_self,_blank'],
             'items.*.parent_id' => ['nullable', 'integer'],
             'items.*.order' => ['required', 'integer', 'min:0'],
@@ -192,6 +194,7 @@ final class MenuController
                         'page_id' => $item['page_id'] ?? null,
                         'url' => $item['url'] ?? null,
                         'label' => $item['label'],
+                        'html_id' => $item['html_id'] ?? null,
                         'target' => $item['target'],
                         'parent_id' => $parentId,
                         'order' => $item['order'],
@@ -204,6 +207,7 @@ final class MenuController
                         'parent_id' => $parentId,
                         'order' => $item['order'],
                         'label' => $item['label'],
+                        'html_id' => $item['html_id'] ?? null,
                     ]);
                 }
 
@@ -246,6 +250,7 @@ final class MenuController
             'page_id' => $item->page_id,
             'url' => $item->url,
             'label' => $item->label,
+            'html_id' => $item->html_id,
             'css_classes' => $item->css_classes,
             'target' => $item->target,
             'order' => $item->order,
