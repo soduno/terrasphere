@@ -75,7 +75,19 @@ interface EditingItem {
 
 export default function MenuEditor({ menu, pages }: MenuEditorProps) {
   const [items, setItems] = useState<MenuItemData[]>(menu.items);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => {
+    const ids = new Set<number>();
+    const collect = (list: MenuItemData[]) => {
+      for (const item of list) {
+        if (item.children && item.children.length > 0) {
+          ids.add(item.id);
+          collect(item.children);
+        }
+      }
+    };
+    collect(menu.items);
+    return ids;
+  });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EditingItem>({ id: 0, label: '', url: '', html_id: '', css_classes: '', target: '_self' });
   const [tagInput, setTagInput] = useState('');
