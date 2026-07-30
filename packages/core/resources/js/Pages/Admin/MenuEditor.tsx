@@ -16,11 +16,12 @@ import {
   Search,
   Trash2,
   Type,
+  X,
 } from 'lucide-react';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
-import { Checkbox } from '@ui/checkbox';
+import { Switch } from '@ui/switch';
 
 interface PageOption {
   id: number;
@@ -75,6 +76,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<EditingItem>({ id: 0, label: '', url: '', css_classes: '', target: '_self' });
+  const [tagInput, setTagInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   const [customLabel, setCustomLabel] = useState('');
@@ -154,6 +156,21 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
         ...item,
         children: item.children ? removeFromTree(item.children, id) : undefined,
       }));
+  };
+
+  const cssTags = editForm.css_classes.split(/\s+/).filter(Boolean);
+
+  const addCssTag = (tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+    const existing = editForm.css_classes.split(/\s+/).filter(Boolean);
+    if (existing.includes(trimmed)) return;
+    setEditForm((f) => ({ ...f, css_classes: [...existing, trimmed].join(' ') }));
+  };
+
+  const removeCssTag = (tag: string) => {
+    const existing = editForm.css_classes.split(/\s+/).filter(Boolean);
+    setEditForm((f) => ({ ...f, css_classes: existing.filter((t) => t !== tag).join(' ') }));
   };
 
   const startEdit = (item: MenuItemData) => {
@@ -395,7 +412,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
             <div className="flex-1 space-y-3 py-1">
               <div className="flex gap-3">
                 <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs">Label</Label>
+                  <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Label</Label>
                   <Input
                     value={editForm.label}
                     onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
@@ -404,7 +421,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
                 </div>
                 {item.type === 'custom' && (
                   <div className="flex-1 space-y-1.5">
-                    <Label className="text-xs">URL</Label>
+                    <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">URL</Label>
                     <Input
                       value={editForm.url}
                       onChange={(e) => setEditForm((f) => ({ ...f, url: e.target.value }))}
@@ -413,26 +430,55 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
                   </div>
                 )}
               </div>
-              <div className="flex gap-3 items-end">
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs">CSS Classes</Label>
-                  <Input
-                    value={editForm.css_classes}
-                    onChange={(e) => setEditForm((f) => ({ ...f, css_classes: e.target.value }))}
-                    placeholder="Optional"
-                    className="h-9 text-sm rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">CSS Classes</Label>
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 min-h-[36px] items-center">
+                  {cssTags.map((tag) => (
+                    <span key={tag} className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+                      {tag}
+                      <button
+                        onClick={() => removeCssTag(tag)}
+                        className="hover:text-indigo-900 dark:hover:text-indigo-100"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        addCssTag(tagInput);
+                        setTagInput('');
+                      }
+                      if (e.key === 'Backspace' && !tagInput && cssTags.length > 0) {
+                        removeCssTag(cssTags[cssTags.length - 1]);
+                      }
+                    }}
+                    placeholder={cssTags.length === 0 ? 'Type and press space to add' : 'Add more...'}
+                    className="flex-1 min-w-[100px] bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
                   />
                 </div>
-                <div className="flex items-center gap-2 pb-1">
-                  <Checkbox
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2.5">
+                  <Switch
                     id={`target-${item.id}`}
                     checked={editForm.target === '_blank'}
-                    onCheckedChange={(checked) => setEditForm((f) => ({ ...f, target: checked === true ? '_blank' : '_self' }))}
+                    onCheckedChange={(checked) => setEditForm((f) => ({ ...f, target: checked ? '_blank' : '_self' }))}
                   />
-                  <Label htmlFor={`target-${item.id}`} className="text-xs cursor-pointer">Open in new tab</Label>
+                  <Label htmlFor={`target-${item.id}`} className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                    Open in new tab
+                  </Label>
                 </div>
-                <Button size="sm" onClick={saveEdit} className="h-9">Save</Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-9">Cancel</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-9 text-gray-500">Cancel</Button>
+                  <Button size="sm" onClick={saveEdit} className="h-9">Save</Button>
+                </div>
               </div>
             </div>
           )}

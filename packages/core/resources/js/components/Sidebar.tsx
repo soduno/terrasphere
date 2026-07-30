@@ -66,19 +66,21 @@ export function Sidebar() {
   });
 
   const toggleMenu = (href: string) => {
-    setOpenMenus((prev) => ({ ...prev, [href]: !prev[href] }));
+    setOpenMenus((prev) => {
+      const isOpen = prev[href] ?? false;
+      if (isOpen) return { [href]: false };
+      return { [href]: true };
+    });
   };
 
   useEffect(() => {
     setOpenMenus((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const key of Object.keys(prev)) {
-        const item = navigation.find((i) => i.href === key);
-        if (item?.children && item.children.some((child) => url.startsWith(child.href))) {
-          next[key] = true;
+      for (const item of navigation) {
+        if (item.children && item.children.some((child) => url.startsWith(child.href))) {
+          return { [item.href]: true };
         }
       }
-      return next;
+      return prev;
     });
   }, [url, navigation]);
 
@@ -120,6 +122,7 @@ export function Sidebar() {
                   }`}>
                     <Link
                       href={item.href}
+                      onClick={() => setOpenMenus({ [item.href]: true })}
                       className={`flex items-center gap-3 px-4 py-3 flex-1 ${
                         active
                           ? 'text-indigo-700 dark:text-indigo-300'
