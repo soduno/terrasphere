@@ -221,25 +221,29 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
   };
 
   const moveItemAsChild = (list: MenuItemData[], draggedId: number, parentId: number): MenuItemData[] => {
-    if (isDescendant(list, draggedId, parentId)) return list;
+    if (isDescendant(list, parentId, draggedId)) return list;
 
     const draggedItem = findItemInTree(list, draggedId);
     if (!draggedItem) return list;
 
     const without = removeFromTree(list, draggedId);
 
-    return without.map((item) => {
-      if (item.id === parentId) {
-        return {
-          ...item,
-          children: [...(item.children ?? []), { ...draggedItem, children: draggedItem.children ? [...draggedItem.children] : undefined }],
-        };
-      }
-      if (item.children) {
-        return { ...item, children: moveItemAsChild(item.children, draggedId, parentId) };
-      }
-      return item;
-    });
+    const insert = (items: MenuItemData[]): MenuItemData[] => {
+      return items.map((item) => {
+        if (item.id === parentId) {
+          return {
+            ...item,
+            children: [...(item.children ?? []), { ...draggedItem, children: draggedItem.children ? [...draggedItem.children] : undefined }],
+          };
+        }
+        if (item.children) {
+          return { ...item, children: insert(item.children) };
+        }
+        return item;
+      });
+    };
+
+    return insert(without);
   };
 
   const handleMouseDown = (e: React.MouseEvent, itemId: number) => {
@@ -476,12 +480,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
         <div
           data-item-id={item.id}
           data-depth={depth}
-          onMouseDown={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('button, input, .switch')) return;
-            handleMouseDown(e, item.id);
-          }}
-          className={`group flex items-center gap-2.5 px-4 py-3 rounded-xl transition-all cursor-grab active:cursor-grabbing relative ${
+          className={`group flex items-center gap-2.5 px-4 py-3 rounded-xl transition-all relative ${
             isDragging
               ? 'invisible'
               : isEditing
@@ -492,7 +491,12 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
           }`}
           style={{ marginLeft: `${depth * 24}px` }}
         >
-          <GripVertical className="w-4 h-4 text-gray-400 shrink-0" />
+          <div
+            onMouseDown={(e) => handleMouseDown(e, item.id)}
+            className="shrink-0 cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="w-4 h-4 text-gray-400" />
+          </div>
 
           {hasChildren ? (
             <button onClick={() => toggleExpand(item.id)} className="shrink-0">
