@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { api } from '@adapter/api';
 import {
   ChevronDown,
+  Cog,
   FileText,
   Folders,
   Image,
@@ -14,6 +15,7 @@ import {
   Moon,
   Puzzle,
   Settings,
+  Shield,
   Sun,
   User,
   type LucideIcon,
@@ -48,6 +50,8 @@ const icons: Record<string, LucideIcon> = {
   overview: LayoutGrid,
   groups: Folders,
   menu: Menu,
+  cog: Cog,
+  shield: Shield,
 };
 
 export function Sidebar() {
@@ -68,19 +72,18 @@ export function Sidebar() {
   const toggleMenu = (href: string) => {
     setOpenMenus((prev) => {
       const isOpen = prev[href] ?? false;
-      if (isOpen) return { [href]: false };
-      return { [href]: true };
+      return { [href]: !isOpen };
     });
   };
 
   useEffect(() => {
-    setOpenMenus((prev) => {
+    setOpenMenus(() => {
       for (const item of navigation) {
         if (item.children && item.children.some((child) => url.startsWith(child.href))) {
           return { [item.href]: true };
         }
       }
-      return prev;
+      return {};
     });
   }, [url, navigation]);
 

@@ -26,9 +26,9 @@ final class AdminNavigation
             'href' => '/admin/settings',
             'icon' => 'settings',
             'children' => [
-                ['name' => 'System', 'href' => '/admin/settings', 'icon' => 'settings'],
+                ['name' => 'System', 'href' => '/admin/settings', 'icon' => 'cog'],
                 ['name' => 'Profile', 'href' => '/admin/profile', 'icon' => 'profile'],
-                ['name' => 'Roles', 'href' => '/admin/roles', 'icon' => 'profile'],
+                ['name' => 'Roles', 'href' => '/admin/roles', 'icon' => 'shield'],
             ],
         ],
         'extensions' => ['name' => 'Extensions', 'href' => '/admin/extensions', 'icon' => 'extensions'],
