@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import { api } from '@adapter/api';
 import {
@@ -34,7 +34,8 @@ interface MenuItemData {
   page_id: number | null;
   url: string | null;
   label: string;
-  css_classes: string | null;
+  html_id?: string | null;
+  css_classes?: string | null;
   target: string;
   order: number;
   page?: { id: number; title: string } | null;
@@ -67,6 +68,7 @@ interface EditingItem {
   id: number;
   label: string;
   url: string;
+  html_id: string;
   css_classes: string;
   target: string;
 }
@@ -75,14 +77,19 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
   const [items, setItems] = useState<MenuItemData[]>(menu.items);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<EditingItem>({ id: 0, label: '', url: '', css_classes: '', target: '_self' });
+  const [editForm, setEditForm] = useState<EditingItem>({ id: 0, label: '', url: '', html_id: '', css_classes: '', target: '_self' });
   const [tagInput, setTagInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   const [customLabel, setCustomLabel] = useState('');
   const [saving, setSaving] = useState(false);
-  const [dragOverId, setDragOverId] = useState<number | null>(null);
-  const [dropPosition, setDropPosition] = useState<'top' | 'center' | 'bottom'>('center');
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [targetDragId, setTargetDragId] = useState<number | null>(null);
+  const [dragMode, setDragMode] = useState<'sibling' | 'child'>('sibling');
+
+  const cloneRef = useRef<HTMLElement | null>(null);
+  const offsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const originalItemsRef = useRef<MenuItemData[]>([]);
 
   const filteredPages = pages.filter((p) =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -158,6 +165,217 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
       }));
   };
 
+  const findItemInTree = (list: MenuItemData[], id: number): MenuItemData | null => {
+    for (const item of list) {
+      if (item.id === id) return item;
+      if (item.children) {
+        const found = findItemInTree(item.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const moveItemSibling = (list: MenuItemData[], draggedId: number, targetId: number, position: 'above' | 'below'): MenuItemData[] => {
+    const draggedItem = findItemInTree(list, draggedId);
+    if (!draggedItem) return list;
+
+    const without = removeFromTree(list, draggedId);
+
+    const insert = (items: MenuItemData[]): MenuItemData[] => {
+      const result: MenuItemData[] = [];
+      for (const item of items) {
+        if (item.id === targetId) {
+          if (position === 'above') {
+            result.push({ ...draggedItem, children: draggedItem.children ? [...draggedItem.children] : undefined });
+            result.push(item);
+          } else {
+            result.push(item);
+            result.push({ ...draggedItem, children: draggedItem.children ? [...draggedItem.children] : undefined });
+          }
+        } else if (item.children) {
+          const hasTarget = findItemInTree(item.children, targetId);
+          if (hasTarget) {
+            result.push({ ...item, children: insert(item.children) });
+          } else {
+            result.push(item);
+          }
+        } else {
+          result.push(item);
+        }
+      }
+      return result;
+    };
+
+    return insert(without);
+  };
+
+  const isDescendant = (list: MenuItemData[], parentId: number, targetId: number): boolean => {
+    const target = findItemInTree(list, targetId);
+    if (!target || !target.children) return false;
+    for (const child of target.children) {
+      if (child.id === parentId) return true;
+      if (child.children && isDescendant(list, parentId, child.id)) return true;
+    }
+    return false;
+  };
+
+  const moveItemAsChild = (list: MenuItemData[], draggedId: number, parentId: number): MenuItemData[] => {
+    if (isDescendant(list, draggedId, parentId)) return list;
+
+    const draggedItem = findItemInTree(list, draggedId);
+    if (!draggedItem) return list;
+
+    const without = removeFromTree(list, draggedId);
+
+    return without.map((item) => {
+      if (item.id === parentId) {
+        return {
+          ...item,
+          children: [...(item.children ?? []), { ...draggedItem, children: draggedItem.children ? [...draggedItem.children] : undefined }],
+        };
+      }
+      if (item.children) {
+        return { ...item, children: moveItemAsChild(item.children, draggedId, parentId) };
+      }
+      return item;
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent, itemId: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const el = (e.currentTarget as HTMLElement).closest('[data-item-id]') as HTMLElement;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('data-item-id');
+    clone.removeAttribute('data-depth');
+    clone.style.position = 'fixed';
+    clone.style.left = `${rect.left}px`;
+    clone.style.top = `${rect.top}px`;
+    clone.style.width = `${rect.width}px`;
+    clone.style.zIndex = '9999';
+    clone.style.pointerEvents = 'none';
+    clone.style.margin = '0';
+    clone.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
+    clone.style.transform = 'rotate(1deg)';
+    clone.style.transition = 'transform 150ms ease';
+    clone.style.opacity = '1';
+    clone.style.visibility = 'visible';
+    document.body.appendChild(clone);
+
+    cloneRef.current = clone;
+    offsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+
+    originalItemsRef.current = items;
+
+    setDraggingId(itemId);
+  };
+
+  useEffect(() => {
+    if (draggingId === null) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const clone = cloneRef.current;
+      if (!clone) return;
+
+      clone.style.left = `${e.clientX - offsetRef.current.x}px`;
+      clone.style.top = `${e.clientY - offsetRef.current.y}px`;
+      clone.style.transform = 'rotate(2deg)';
+
+      const itemEls = document.querySelectorAll<HTMLElement>('[data-item-id]');
+      let closestId: number | null = null;
+      let closestDist = Infinity;
+      let closestY = 0;
+      let closestHeight = 0;
+      let closestLeft = 0;
+
+      for (const itemEl of itemEls) {
+        const id = parseInt(itemEl.dataset.itemId!, 10);
+        if (id === draggingId) continue;
+
+        const rect = itemEl.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const dist = Math.abs(e.clientY - midY);
+
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestId = id;
+          closestY = rect.top;
+          closestHeight = rect.height;
+          closestLeft = rect.left;
+        }
+      }
+
+      if (closestId !== null) {
+        const childThreshold = closestLeft + 60;
+
+        if (e.clientX > childThreshold) {
+          setTargetDragId(closestId);
+          setDragMode('child');
+          setItems((prev) => moveItemAsChild(prev, draggingId, closestId));
+          setExpandedIds((prev) => {
+            if (prev.has(closestId)) return prev;
+            const next = new Set(prev);
+            next.add(closestId);
+            return next;
+          });
+        } else {
+          const midY = closestY + closestHeight / 2;
+          const position = e.clientY < midY ? 'above' : 'below';
+          setTargetDragId(closestId);
+          setDragMode('sibling');
+          setItems((prev) => moveItemSibling(prev, draggingId, closestId, position));
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      const clone = cloneRef.current;
+      if (clone) {
+        clone.style.transition = 'opacity 150ms ease, transform 150ms ease';
+        clone.style.opacity = '0';
+        clone.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+          if (clone.parentNode) {
+            document.body.removeChild(clone);
+          }
+        }, 150);
+        cloneRef.current = null;
+      }
+
+      setDraggingId(null);
+      setTargetDragId(null);
+      setDragMode('sibling');
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setItems(originalItemsRef.current);
+        setTargetDragId(null);
+        setDragMode('sibling');
+        handleMouseUp();
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [draggingId]);
+
   const cssTags = editForm.css_classes.split(/\s+/).filter(Boolean);
 
   const addCssTag = (tag: string) => {
@@ -179,6 +397,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
       id: item.id,
       label: item.label,
       url: item.url ?? '',
+      html_id: item.html_id ?? '',
       css_classes: item.css_classes ?? '',
       target: item.target,
     });
@@ -189,6 +408,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
     setItems((prev) => updateInTree(prev, editingId, {
       label: editForm.label,
       url: editForm.url || null,
+      html_id: editForm.html_id || null,
       css_classes: editForm.css_classes || null,
       target: editForm.target,
     }));
@@ -198,6 +418,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
       api.put(`/admin/items/${editingId}`, {
         label: editForm.label,
         url: editForm.url || null,
+        html_id: editForm.html_id || null,
         css_classes: editForm.css_classes || null,
         target: editForm.target,
       });
@@ -216,106 +437,6 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
     });
   };
 
-  const handleDragStart = (e: React.DragEvent, itemId: number) => {
-    e.dataTransfer.setData('text/plain', String(itemId));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragLeave = () => {
-    setDragOverId(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, targetId: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverId(targetId);
-
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const pct = y / rect.height;
-
-    if (pct < 0.25) setDropPosition('top');
-    else if (pct > 0.75) setDropPosition('bottom');
-    else setDropPosition('center');
-  };
-
-  const handleDrop = (e: React.DragEvent, targetId: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const position = dropPosition;
-    setDragOverId(null);
-
-    const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    if (draggedId === targetId) return;
-
-    setItems((prev) => {
-      const allItems = flattenItems(prev);
-      const draggedItem = allItems.find((i) => i.id === draggedId);
-      if (!draggedItem) return prev;
-
-      const without = removeFromTree(prev, draggedId);
-
-      if (position === 'center') {
-        return insertAsChild(without, draggedItem, targetId);
-      }
-
-      return insertSibling(without, draggedItem, targetId, position);
-    });
-  };
-
-  const insertSibling = (list: MenuItemData[], item: MenuItemData, targetId: number, direction: 'top' | 'bottom'): MenuItemData[] => {
-    const result: MenuItemData[] = [];
-    for (const existing of list) {
-      if (existing.id === targetId) {
-        if (direction === 'top') {
-          result.push(item);
-          result.push(existing);
-        } else {
-          result.push(existing);
-          result.push(item);
-        }
-      } else if (existing.children) {
-        const found = findInList(existing.children, targetId);
-        if (found) {
-          const newChildren = insertSibling(existing.children, item, targetId, direction);
-          result.push({ ...existing, children: newChildren });
-        } else {
-          result.push(existing);
-        }
-      } else {
-        result.push(existing);
-      }
-    }
-    return result;
-  };
-
-  const findInList = (list: MenuItemData[], id: number): boolean => {
-    for (const item of list) {
-      if (item.id === id) return true;
-      if (item.children && findInList(item.children, id)) return true;
-    }
-    return false;
-  };
-
-  const insertAsChild = (list: MenuItemData[], item: MenuItemData, parentId: number): MenuItemData[] => {
-    return list.map((existing) => {
-      if (existing.id === parentId) {
-        return {
-          ...existing,
-          children: [...(existing.children ?? []), item],
-        };
-      }
-      if (existing.children) {
-        return {
-          ...existing,
-          children: insertAsChild(existing.children, item, parentId),
-        };
-      }
-      return existing;
-    });
-  };
-
   const handleSave = useCallback(() => {
     setSaving(true);
 
@@ -326,6 +447,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
         page_id: item.page_id ?? null,
         url: item.url ?? null,
         label: item.label,
+        html_id: item.html_id ?? null,
         target: item.target,
         parent_id: null,
         order: index,
@@ -347,31 +469,30 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
     const isExpanded = expandedIds.has(item.id);
     const isEditing = editingId === item.id;
     const hasChildren = item.children && item.children.length > 0;
-    const isDragOver = dragOverId === item.id;
+    const isDragging = draggingId === item.id;
 
     return (
       <div key={item.id}>
-        {isDragOver && dropPosition === 'top' && (
-          <div className="h-0.5 bg-purple-500 rounded-full mx-2 mb-0.5" />
-        )}
         <div
-          draggable
-          onDragStart={(e) => handleDragStart(e, item.id)}
-          onDragOver={(e) => handleDragOver(e, item.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, item.id)}
-          className={`group flex items-center gap-2 px-3 py-2.5 rounded-xl transition-colors relative ${
-            isEditing
-              ? 'bg-indigo-50 dark:bg-indigo-950'
-              : isDragOver
-                ? dropPosition === 'center'
+          data-item-id={item.id}
+          data-depth={depth}
+          onMouseDown={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('button, input, .switch')) return;
+            handleMouseDown(e, item.id);
+          }}
+          className={`group flex items-center gap-2.5 px-4 py-3 rounded-xl transition-all cursor-grab active:cursor-grabbing relative ${
+            isDragging
+              ? 'invisible'
+              : isEditing
+                ? 'bg-indigo-50 dark:bg-indigo-950 ring-2 ring-indigo-200 dark:ring-indigo-800'
+                : targetDragId === item.id && dragMode === 'child'
                   ? 'bg-purple-50/50 dark:bg-purple-950/30 ring-2 ring-purple-400/50'
-                  : ''
-                : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                  : 'ring-1 ring-gray-100 dark:ring-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:ring-gray-300 dark:hover:ring-gray-700'
           }`}
           style={{ marginLeft: `${depth * 24}px` }}
         >
-          <GripVertical className="w-4 h-4 text-gray-400 cursor-grab shrink-0" />
+          <GripVertical className="w-4 h-4 text-gray-400 shrink-0" />
 
           {hasChildren ? (
             <button onClick={() => toggleExpand(item.id)} className="shrink-0">
@@ -397,13 +518,13 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
               </span>
               <button
                 onClick={() => startEdit(item)}
-                className="shrink-0 p-1 rounded-md text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 transition-opacity"
+                className="shrink-0 p-1 rounded-md text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => removeItem(item.id)}
-                className="shrink-0 p-1 rounded-md text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-opacity"
+                className="shrink-0 p-1 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -429,6 +550,16 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">HTML ID</Label>
+                <Input
+                  value={editForm.html_id}
+                  onChange={(e) => setEditForm((f) => ({ ...f, html_id: e.target.value }))}
+                  placeholder="Optional unique ID"
+                  className="h-9 text-sm rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -484,9 +615,10 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
           )}
         </div>
 
-        {isExpanded && hasChildren && item.children?.map((child) => renderItem(child, depth + 1))}
-        {isDragOver && dropPosition === 'bottom' && (
-          <div className="h-0.5 bg-purple-500 rounded-full mx-2 mt-0.5" />
+        {isExpanded && hasChildren && (
+          <div className="space-y-3 mt-3">
+            {item.children?.map((child) => renderItem(child, depth + 1))}
+          </div>
         )}
       </div>
     );
@@ -548,7 +680,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
               {filteredPages.length === 0 && searchQuery ? (
                 <p className="py-8 text-center text-xs text-gray-400 dark:text-gray-500">No pages match your search</p>
               ) : (
-                <div className="space-y-0.5">
+            <div className="space-y-2">
                   {filteredPages.map((page) => {
                     const alreadyAdded = addedPageIds.has(page.id);
 
@@ -643,7 +775,7 @@ export default function MenuEditor({ menu, pages }: MenuEditorProps) {
               </p>
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <div className="space-y-3">
               {items.map((item) => renderItem(item, 0))}
             </div>
           )}
