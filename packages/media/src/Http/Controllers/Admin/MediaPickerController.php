@@ -25,7 +25,7 @@ final class MediaPickerController
                         'asset' => $asset->uuid,
                         'filename' => $asset->filename,
                     ], false),
-                    'name' => $asset->filename,
+                    'name' => $asset->displayName(),
                     'width' => $asset->width,
                     'height' => $asset->height,
                     'size' => $asset->size,

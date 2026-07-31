@@ -40,6 +40,7 @@ final class MediaBulkDeleteController
                     );
                 }
 
+                $disk->delete("media/.thumbnails/{$asset->uuid}.webp");
                 $asset->delete();
             });
 

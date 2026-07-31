@@ -17,7 +17,7 @@ final class MediaFileController
         abort_unless($disk->exists($asset->path), 404);
 
         return $disk->response($asset->path, $asset->filename, [
-            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'Cache-Control' => 'public, max-age=0, must-revalidate',
             'Content-Type' => $asset->mime_type,
         ]);
     }

@@ -13,6 +13,9 @@ final class UsedImageFinder
      * @var array<string, array{
      *     id: ?int,
      *     deleteUrl: ?string,
+     *     convertUrl: ?string,
+     *     duplicateUrl: ?string,
+     *     editorUrl: ?string,
      *     url: string,
      *     name: string,
      *     host: string,
@@ -29,9 +32,17 @@ final class UsedImageFinder
     private array $images = [];
 
     /**
+     * @var array<string, string>
+     */
+    private array $uploadedAssetKeys = [];
+
+    /**
      * @return list<array{
      *     id: ?int,
      *     deleteUrl: ?string,
+     *     convertUrl: ?string,
+     *     duplicateUrl: ?string,
+     *     editorUrl: ?string,
      *     url: string,
      *     name: string,
      *     host: string,
@@ -48,6 +59,7 @@ final class UsedImageFinder
     public function all(): array
     {
         $this->images = [];
+        $this->uploadedAssetKeys = [];
         $this->addUploadedAssets();
 
         Page::query()
@@ -100,16 +112,33 @@ final class UsedImageFinder
                     'asset' => $asset->uuid,
                     'filename' => $asset->filename,
                 ], false);
+                $key = hash('sha256', $url);
 
-                $this->images[hash('sha256', $url)] = [
+                $this->uploadedAssetKeys[$asset->uuid] = $key;
+                $this->images[$key] = [
                     'id' => (int) $asset->getKey(),
                     'deleteUrl' => route(
                         'terrasphere.admin.media.destroy',
                         ['asset' => $asset->uuid],
                         false
                     ),
+                    'editorUrl' => route(
+                        'terrasphere.admin.media.edit',
+                        ['asset' => $asset->uuid],
+                        false
+                    ),
+                    'convertUrl' => route(
+                        'terrasphere.admin.media.update',
+                        ['asset' => $asset->uuid],
+                        false
+                    ),
+                    'duplicateUrl' => route(
+                        'terrasphere.admin.media.duplicate',
+                        ['asset' => $asset->uuid],
+                        false
+                    ),
                     'url' => $url,
-                    'name' => $asset->filename,
+                    'name' => $asset->displayName(),
                     'host' => 'Media library',
                     'mimeType' => $asset->mime_type,
                     'size' => $asset->size,
@@ -232,7 +261,16 @@ final class UsedImageFinder
             return;
         }
 
-        $key = hash('sha256', $url);
+        $mediaUuid = $this->internalMediaUuid($url);
+        if ($mediaUuid !== null) {
+            $key = $this->uploadedAssetKeys[$mediaUuid] ?? null;
+
+            if ($key === null) {
+                return;
+            }
+        } else {
+            $key = hash('sha256', $url);
+        }
         $pageId = (int) $page->getKey();
 
         if (! isset($this->images[$key])) {
@@ -242,6 +280,9 @@ final class UsedImageFinder
             $this->images[$key] = [
                 'id' => null,
                 'deleteUrl' => null,
+                'convertUrl' => null,
+                'duplicateUrl' => null,
+                'editorUrl' => null,
                 'url' => $url,
                 'name' => $filename !== '' ? $filename : 'Image',
                 'host' => $this->host($url),
@@ -283,5 +324,31 @@ final class UsedImageFinder
         $host = parse_url($url, PHP_URL_HOST);
 
         return is_string($host) && $host !== '' ? $host : 'Local file';
+    }
+
+    private function internalMediaUuid(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (
+            is_string($host)
+            && $host !== ''
+            && strcasecmp($host, request()->getHost()) !== 0
+        ) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (
+            ! is_string($path)
+            || preg_match(
+                '#^/media/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/|$)#i',
+                $path,
+                $matches,
+            ) !== 1
+        ) {
+            return null;
+        }
+
+        return strtolower($matches[1]);
     }
 }
