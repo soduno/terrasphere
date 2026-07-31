@@ -194,7 +194,10 @@ final class PageController
         ]);
     }
 
-    public function saveFieldValues(Request $request, Page $page): RedirectResponse
+    public function saveFieldValues(
+        Request $request,
+        Page $page,
+    ): RedirectResponse|JsonResponse
     {
         abort_unless($page->content_type === 'custom_fields', 404);
 
@@ -206,6 +209,12 @@ final class PageController
             'draft_field_values' => $validated['values'],
             'lock_version' => $page->lock_version + 1,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'values' => $page->draft_field_values ?? [],
+            ]);
+        }
 
         return redirect()->route('terrasphere.admin.content');
     }
