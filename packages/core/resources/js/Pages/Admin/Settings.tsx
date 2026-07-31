@@ -45,9 +45,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const savingRef = useRef(false);
-  const pendingSaveRef = useRef(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const activeSavesRef = useRef(0);
 
   useEffect(() => {
     if (success) {
@@ -55,14 +53,8 @@ export default function Settings() {
     }
   }, [success]);
 
-  useEffect(() => {
-    return () => {
-      clearTimeout(debounceRef.current);
-    };
-  }, []);
-
   const doSave = useCallback((partial?: Record<string, unknown>) => {
-    savingRef.current = true;
+    activeSavesRef.current++;
     setSaving(true);
     setFieldErrors({});
     const data: Record<string, unknown> = partial ?? {
@@ -90,23 +82,13 @@ export default function Settings() {
         toast.error('Failed to save changes');
       }
     }).finally(() => {
-      savingRef.current = false;
-      setSaving(false);
-      if (pendingSaveRef.current) {
-        pendingSaveRef.current = false;
-        doSave();
-      }
+      activeSavesRef.current--;
+      setSaving(activeSavesRef.current > 0);
     });
   }, [siteName, siteUrl, siteDescription, metaTitle, metaDescription, enableSeo, enableCaching, enableImageOptimization, enableLazyLoading]);
 
-  const autoSave = useCallback(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => doSave(), 1200);
-  }, [doSave]);
-
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    clearTimeout(debounceRef.current);
     doSave();
   };
 
@@ -139,7 +121,7 @@ export default function Settings() {
                   placeholder="ContentFlow CMS"
                   value={siteName}
                   onChange={(e) => setSiteName(e.target.value)}
-                  onBlur={autoSave}
+                  onBlur={() => doSave({ site_name: siteName })}
                   className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('site_name')}`}
                 />
                 {fieldErrors.site_name && (
@@ -153,7 +135,7 @@ export default function Settings() {
                   placeholder="https://example.com"
                   value={siteUrl}
                   onChange={(e) => setSiteUrl(e.target.value)}
-                  onBlur={autoSave}
+                  onBlur={() => doSave({ site_url: siteUrl })}
                   className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('site_url')}`}
                 />
                 {fieldErrors.site_url && (
@@ -167,7 +149,7 @@ export default function Settings() {
                   placeholder="A modern content management system"
                   value={siteDescription}
                   onChange={(e) => setSiteDescription(e.target.value)}
-                  onBlur={autoSave}
+                  onBlur={() => doSave({ site_description: siteDescription })}
                   className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('site_description')}`}
                 />
                 {fieldErrors.site_description && (
@@ -190,7 +172,7 @@ export default function Settings() {
                   placeholder="ContentFlow - Modern CMS"
                   value={metaTitle}
                   onChange={(e) => setMetaTitle(e.target.value)}
-                  onBlur={autoSave}
+                  onBlur={() => doSave({ meta_title: metaTitle })}
                   className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('meta_title')}`}
                 />
                 {fieldErrors.meta_title && (
@@ -204,7 +186,7 @@ export default function Settings() {
                   placeholder="Build beautiful websites with our modern CMS"
                   value={metaDescription}
                   onChange={(e) => setMetaDescription(e.target.value)}
-                  onBlur={autoSave}
+                  onBlur={() => doSave({ meta_description: metaDescription })}
                   className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('meta_description')}`}
                 />
                 {fieldErrors.meta_description && (

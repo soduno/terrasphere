@@ -1,11 +1,15 @@
 import { Link, router } from '@inertiajs/react';
-import { api } from '@adapter/api';
+import { api, ApiError } from '@adapter/api';
 import {
   Check,
   Copy,
+  CopyPlus,
+  Ellipsis,
   ExternalLink,
+  FileType2,
   ImageOff,
   LoaderCircle,
+  Pencil,
   Trash2,
   UploadCloud,
 } from 'lucide-react';
@@ -20,8 +24,39 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@ui/alert-dialog';
+import { Button } from '@ui/button';
 import { Checkbox } from '@ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@ui/select';
 import { DataTable, type DataTableRowState } from '@components/DataTable';
+import {
+  ImageEditor,
+  exportMimeType,
+  extensionForMimeType,
+  mimeTypeForFormat,
+  wholeImage,
+  type ImageFormat,
+} from '../../lib/imageEditor';
 
 interface ImageUsagePage {
   id: number;
@@ -33,6 +68,9 @@ interface ImageUsagePage {
 interface UsedImage {
   id: number | null;
   deleteUrl: string | null;
+  convertUrl: string | null;
+  duplicateUrl: string | null;
+  editorUrl: string | null;
   url: string;
   name: string;
   host: string;
@@ -48,12 +86,19 @@ interface UsedImage {
 
 interface MediaProps {
   images: UsedImage[];
+  formats: SupportedImageFormat[];
   summary: {
     images: number;
     uploaded: number;
     references: number;
     pages: number;
   };
+}
+
+interface SupportedImageFormat {
+  value: ImageFormat;
+  label: string;
+  mimeType: string;
 }
 
 function formatFileSize(bytes: number | null) {
@@ -84,7 +129,7 @@ function ImagePreview({ image }: { image: UsedImage }) {
   );
 }
 
-export default function MediaIndex({ images, summary }: MediaProps) {
+export default function MediaIndex({ images, formats, summary }: MediaProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -95,6 +140,11 @@ export default function MediaIndex({ images, summary }: MediaProps) {
   const [deletingImageUrls, setDeletingImageUrls] =
     useState<Set<string>>(() => new Set());
   const [singleDeleteTarget, setSingleDeleteTarget] = useState<UsedImage | null>(null);
+  const [convertTarget, setConvertTarget] = useState<UsedImage | null>(null);
+  const [convertFormat, setConvertFormat] = useState('');
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [duplicatingImageUrl, setDuplicatingImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFiles = (incomingFiles: FileList | File[]) => {
@@ -197,6 +247,92 @@ export default function MediaIndex({ images, summary }: MediaProps) {
     setSingleDeleteTarget(null);
   };
 
+  const openConverter = (target: UsedImage) => {
+    const nextFormat = formats.find((format) => format.mimeType !== target.mimeType)
+      ?? formats[0];
+
+    setConvertTarget(target);
+    setConvertFormat(nextFormat?.value ?? '');
+    setConvertError(null);
+  };
+
+  const convertImage = async () => {
+    if (!convertTarget?.convertUrl || !convertFormat || isConverting) return;
+
+    setIsConverting(true);
+    setConvertError(null);
+
+    try {
+      const source = new Image();
+      source.decoding = 'async';
+      source.src = `${convertTarget.url}?v=${Date.now()}`;
+      await new Promise<void>((resolve, reject) => {
+        source.onload = () => resolve();
+        source.onerror = () => reject(new Error('The image could not be decoded.'));
+      });
+
+      const requestedMimeType = convertFormat === 'gif'
+        ? 'image/webp'
+        : exportMimeType(mimeTypeForFormat(convertFormat as ImageFormat));
+      const editor = new ImageEditor(source);
+      const blob = await editor.export({
+        crop: wholeImage(source.naturalWidth, source.naturalHeight),
+        width: source.naturalWidth,
+        height: source.naturalHeight,
+        mimeType: requestedMimeType,
+        quality: requestedMimeType === 'image/jpeg' ? 0.92 : 0.98,
+      });
+      const formData = new FormData();
+      formData.append('_method', 'PUT');
+      formData.append('format', convertFormat);
+      formData.append(
+        'image',
+        new File(
+          [blob],
+          `${convertTarget.name}.${extensionForMimeType(blob.type)}`,
+          { type: blob.type },
+        ),
+      );
+
+      await api.post(convertTarget.convertUrl, formData);
+      setConvertTarget(null);
+      router.reload({
+        only: ['images', 'summary'],
+      });
+    } catch (reason) {
+      if (reason instanceof ApiError) {
+        setConvertError(
+          Object.values(reason.errors).flat()[0] ?? reason.message,
+        );
+      } else {
+        setConvertError(
+          reason instanceof Error ? reason.message : 'The image could not be converted.',
+        );
+      }
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  const duplicateImage = async (target: UsedImage) => {
+    if (!target.duplicateUrl || duplicatingImageUrl !== null) return;
+
+    setDuplicatingImageUrl(target.url);
+
+    try {
+      await api.post(target.duplicateUrl, {});
+      router.reload({
+        only: ['images', 'summary'],
+      });
+    } catch (reason) {
+      setDeleteError(
+        reason instanceof Error ? reason.message : 'The image could not be duplicated.',
+      );
+    } finally {
+      setDuplicatingImageUrl(null);
+    }
+  };
+
   const deleteReferenceCount = singleDeleteTarget
     ? singleDeleteTarget.usageCount
     : 0;
@@ -259,8 +395,13 @@ export default function MediaIndex({ images, summary }: MediaProps) {
               : ''
           }`;
         }}
+        deleteConfirmAction={(targets) =>
+          targets.some((image) => image.usageCount > 0)
+            ? 'Delete anyway'
+            : 'Delete'
+        }
         renderRow={(image, state: DataTableRowState) => (
-          <div className="grid gap-5 px-6 py-5 md:grid-cols-[20px_minmax(280px,1.2fr)_minmax(260px,1fr)_110px_44px] md:items-center md:gap-6">
+          <div className="grid gap-5 px-6 py-5 md:grid-cols-[20px_minmax(250px,1.2fr)_minmax(220px,1fr)_90px_110px_44px] md:items-center md:gap-6">
             <div className="flex items-center">
               <Checkbox
                 aria-label={`Select ${image.name}`}
@@ -275,14 +416,22 @@ export default function MediaIndex({ images, summary }: MediaProps) {
             <div className="flex min-w-0 items-center gap-4">
               <ImagePreview image={image} />
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                  {image.name}
-                </p>
+                {image.editorUrl ? (
+                  <Link
+                    href={image.editorUrl}
+                    className="block truncate text-sm font-medium text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+                  >
+                    {image.name}
+                  </Link>
+                ) : (
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {image.name}
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {[
                     image.host,
                     image.width && image.height ? `${image.width} × ${image.height}` : null,
-                    formatFileSize(image.size),
                   ].filter(Boolean).join(' · ')}
                 </p>
                 <div className="mt-2 flex items-center gap-1">
@@ -333,6 +482,10 @@ export default function MediaIndex({ images, summary }: MediaProps) {
             </div>
 
             <p className="text-sm text-gray-500 dark:text-gray-400">
+              {formatFileSize(image.size) ?? '\u2014'}
+            </p>
+
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {image.updatedAt
                 ? new Intl.DateTimeFormat(undefined, {
                     year: 'numeric',
@@ -342,26 +495,68 @@ export default function MediaIndex({ images, summary }: MediaProps) {
                 : '\u2014'}
             </p>
 
-            <button
-              type="button"
-              disabled={!image.deleteUrl || isDeleting}
-              onClick={() => {
-                setDeleteError(null);
-                setSingleDeleteTarget(image);
-              }}
-              className="flex size-9 items-center justify-center justify-self-start rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 md:justify-self-end dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-400"
-              title={image.deleteUrl ? 'Delete image' : 'Only uploaded images can be deleted'}
-              aria-label={`Delete ${image.name}`}
-            >
-              <Trash2 className="size-4" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  className="flex size-9 items-center justify-center justify-self-start rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30 md:justify-self-end dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                  title="Image actions"
+                  aria-label={`Actions for ${image.name}`}
+                >
+                  <Ellipsis className="size-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  disabled={!image.editorUrl}
+                  onSelect={() => {
+                    if (image.editorUrl) router.visit(image.editorUrl);
+                  }}
+                >
+                  <Pencil />
+                  Edit image
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!image.convertUrl || formats.length === 0}
+                  onSelect={() => {
+                    if (image.convertUrl) openConverter(image);
+                  }}
+                >
+                  <FileType2 />
+                  Convert image
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!image.duplicateUrl || duplicatingImageUrl !== null}
+                  onSelect={() => void duplicateImage(image)}
+                >
+                  {duplicatingImageUrl === image.url
+                    ? <LoaderCircle className="animate-spin" />
+                    : <CopyPlus />}
+                  Duplicate image
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={!image.deleteUrl}
+                  onSelect={() => {
+                    setDeleteError(null);
+                    setSingleDeleteTarget(image);
+                  }}
+                >
+                  <Trash2 />
+                  Delete image
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
         renderListHeader={
-          <div className="hidden grid-cols-[20px_minmax(280px,1.2fr)_minmax(260px,1fr)_110px_44px] gap-6 bg-gray-50/60 px-6 py-3 text-xs uppercase tracking-wider text-gray-500 md:grid dark:bg-gray-800/40 dark:text-gray-400">
+          <div className="hidden grid-cols-[20px_minmax(250px,1.2fr)_minmax(220px,1fr)_90px_110px_44px] gap-6 bg-gray-50/60 px-6 py-3 text-xs uppercase tracking-wider text-gray-500 md:grid dark:bg-gray-800/40 dark:text-gray-400">
             <span />
             <span>Image</span>
             <span>Used on</span>
+            <span>Size</span>
             <span>Updated</span>
             <span className="sr-only">Actions</span>
           </div>
@@ -439,6 +634,92 @@ export default function MediaIndex({ images, summary }: MediaProps) {
         </div>
       </DataTable>
 
+      <Dialog
+        open={convertTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !isConverting) {
+            setConvertTarget(null);
+            setConvertError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md dark:border-gray-800 dark:bg-gray-900">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Convert image</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Choose a new format for {convertTarget?.name}. Its dimensions and
+              media URL will stay the same.
+            </DialogDescription>
+          </DialogHeader>
+
+          {convertTarget && (
+            <div className="flex items-center gap-4 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/60">
+              <ImagePreview image={convertTarget} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                  {convertTarget.name}
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Current format:{' '}
+                  {formats.find((format) => format.mimeType === convertTarget.mimeType)?.label
+                    ?? convertTarget.mimeType?.replace('image/', '').toUpperCase()
+                    ?? 'Unknown'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            Convert to
+            <Select
+              value={convertFormat}
+              onValueChange={setConvertFormat}
+              disabled={isConverting}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Choose a format" />
+              </SelectTrigger>
+              <SelectContent>
+                {formats.map((format) => (
+                  <SelectItem key={format.value} value={format.value}>
+                    {format.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+
+          {(convertTarget?.mimeType === 'image/gif' || convertFormat === 'gif') && (
+            <p className="rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              Animated GIF frames cannot be retained during conversion. The result
+              will be a still image.
+            </p>
+          )}
+
+          {convertError && (
+            <p className="text-sm text-red-600 dark:text-red-400">{convertError}</p>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={isConverting}
+              onClick={() => setConvertTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!convertFormat || isConverting}
+              onClick={() => void convertImage()}
+              className="bg-indigo-600 text-white hover:bg-indigo-700 dark:text-white"
+            >
+              {isConverting && <LoaderCircle className="animate-spin" />}
+              {isConverting ? 'Converting…' : 'Convert image'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={singleDeleteTarget !== null}
         onOpenChange={(open) => {
@@ -477,7 +758,7 @@ export default function MediaIndex({ images, summary }: MediaProps) {
               {isDeleting && (
                 <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Delete image
+              {deleteReferenceCount > 0 ? 'Delete anyway' : 'Delete image'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

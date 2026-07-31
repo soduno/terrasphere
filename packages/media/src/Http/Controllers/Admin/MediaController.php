@@ -6,6 +6,7 @@ namespace TerraSphere\Media\Http\Controllers\Admin;
 
 use Inertia\Inertia;
 use Inertia\Response;
+use TerraSphere\Media\Support\ImageEncoder;
 use TerraSphere\Media\Support\UsedImageFinder;
 
 final class MediaController
@@ -16,6 +17,7 @@ final class MediaController
 
         return Inertia::render('Media/Admin/Index', [
             'images' => $items,
+            'formats' => ImageEncoder::supportedFormats(),
             'summary' => [
                 'images' => count($items),
                 'uploaded' => count(array_filter(

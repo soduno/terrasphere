@@ -19,6 +19,7 @@ final class MediaDeleteController
             throw new RuntimeException('The media file could not be deleted.');
         }
 
+        $disk->delete("media/.thumbnails/{$asset->uuid}.webp");
         $asset->delete();
 
         return back()->with('success', 'Image deleted.');

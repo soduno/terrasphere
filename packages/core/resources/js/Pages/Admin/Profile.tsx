@@ -59,9 +59,7 @@ export default function Profile() {
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const savingRef = useRef(false);
-  const pendingSaveRef = useRef(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const activeSavesRef = useRef(0);
 
   useEffect(() => {
     if (success) {
@@ -69,17 +67,11 @@ export default function Profile() {
     }
   }, [success]);
 
-  useEffect(() => {
-    return () => {
-      clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  const doSave = useCallback(() => {
-    savingRef.current = true;
+  const doSave = useCallback((partial?: Record<string, string | null>) => {
+    activeSavesRef.current++;
     setSavingProfile(true);
     setProfileErrors({});
-    api.put('/admin/profile', {
+    api.put('/admin/profile', partial ?? {
       first_name: firstName || null,
       last_name: lastName || null,
       bio: bio || null,
@@ -96,23 +88,13 @@ export default function Profile() {
         setProfileErrors(mapped);
       }
     }).finally(() => {
-      savingRef.current = false;
-      setSavingProfile(false);
-      if (pendingSaveRef.current) {
-        pendingSaveRef.current = false;
-        doSave();
-      }
+      activeSavesRef.current--;
+      setSavingProfile(activeSavesRef.current > 0);
     });
   }, [firstName, lastName, bio]);
 
-  const saveProfileData = useCallback(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(doSave, 1200);
-  }, [doSave]);
-
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    clearTimeout(debounceRef.current);
     doSave();
   };
 
@@ -191,7 +173,7 @@ export default function Profile() {
                     placeholder="John"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    onBlur={saveProfileData}
+                    onBlur={() => doSave({ first_name: firstName || null })}
                     className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('first_name')}`}
                   />
                   {(inertiaErrors?.first_name || profileErrors.first_name) && (
@@ -205,7 +187,7 @@ export default function Profile() {
                     placeholder="Doe"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    onBlur={saveProfileData}
+                    onBlur={() => doSave({ last_name: lastName || null })}
                     className={`h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl ${fieldErrorClass('last_name')}`}
                   />
                   {(inertiaErrors?.last_name || profileErrors.last_name) && (
@@ -231,7 +213,7 @@ export default function Profile() {
                   rows={4}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  onBlur={saveProfileData}
+                  onBlur={() => doSave({ bio: bio || null })}
                   className={`border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl resize-none ${fieldErrorClass('bio')}`}
                 />
                 {(inertiaErrors?.bio || profileErrors.bio) && (

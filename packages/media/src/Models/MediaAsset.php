@@ -13,6 +13,7 @@ final class MediaAsset extends Model
         'disk',
         'path',
         'filename',
+        'display_name',
         'mime_type',
         'size',
         'width',
@@ -32,5 +33,10 @@ final class MediaAsset extends Model
     public function getRouteKeyName(): string
     {
         return 'uuid';
+    }
+
+    public function displayName(): string
+    {
+        return $this->display_name ?: $this->filename;
     }
 }

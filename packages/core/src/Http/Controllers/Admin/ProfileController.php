@@ -46,14 +46,17 @@ final class ProfileController
 
         $user = $request->user();
 
-        $profile = UserProfile::query()->updateOrCreate(
-            ['user_id' => $user->getKey()],
-            [
-                'first_name' => $validated['first_name'] ?? null,
-                'last_name' => $validated['last_name'] ?? null,
-                'bio' => $validated['bio'] ?? null,
-            ],
-        );
+        $profile = UserProfile::query()->firstOrNew([
+            'user_id' => $user->getKey(),
+        ]);
+
+        foreach (['first_name', 'last_name', 'bio'] as $key) {
+            if ($request->has($key)) {
+                $profile->{$key} = $validated[$key] ?? null;
+            }
+        }
+
+        $profile->save();
 
         if ($request->wantsJson()) {
             return response()->json([

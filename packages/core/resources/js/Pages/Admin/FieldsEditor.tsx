@@ -1,5 +1,6 @@
-import { useState, type DragEvent } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
 import { router } from '@inertiajs/react';
+import { toast } from 'sonner';
 import { api, ApiError } from '@adapter/api';
 import {
   ArrowLeft,
@@ -79,6 +80,11 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
   const [draggedMediaField, setDraggedMediaField] = useState<string | null>(null);
   const [uploadingMediaField, setUploadingMediaField] = useState<string | null>(null);
   const [mediaUploadErrors, setMediaUploadErrors] = useState<Record<string, string>>({});
+  const latestFieldValuesRef = useRef(fieldValues);
+  const fieldSaveInFlightRef = useRef(false);
+  const fieldSavePendingRef = useRef(false);
+
+  latestFieldValuesRef.current = fieldValues;
 
   const handleFieldChange = (fieldName: string, value: any) => {
     setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
@@ -138,6 +144,28 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
       { values: fieldValues },
       { inertia: true },
     );
+  };
+
+  const saveFieldsOnBlur = () => {
+    if (fieldSaveInFlightRef.current) {
+      fieldSavePendingRef.current = true;
+      return;
+    }
+
+    fieldSaveInFlightRef.current = true;
+
+    api.put(`/admin/pages/${page.id}/field-values`, {
+      values: latestFieldValuesRef.current,
+    }).catch(() => {
+      toast.error('The field values could not be saved.');
+    }).finally(() => {
+      fieldSaveInFlightRef.current = false;
+
+      if (fieldSavePendingRef.current) {
+        fieldSavePendingRef.current = false;
+        saveFieldsOnBlur();
+      }
+    });
   };
 
   const handleEditFields = () => {
@@ -265,6 +293,7 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
             id={field.name}
             value={fieldValues[field.name] || ''}
             onChange={(e) => handleFieldChange(field.name, e.target.value)}
+            onBlur={saveFieldsOnBlur}
             className="h-11 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl"
             placeholder={`Enter ${field.label.toLowerCase()}`}
           />
@@ -276,6 +305,7 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
             id={field.name}
             value={fieldValues[field.name] || ''}
             onChange={(e) => handleFieldChange(field.name, e.target.value)}
+            onBlur={saveFieldsOnBlur}
             className="border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl resize-none"
             placeholder={`Enter ${field.label.toLowerCase()}`}
             rows={5}
@@ -614,6 +644,7 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
                           onChange={(e) =>
                             updateRepeaterItem(field.name, index, subField.name, e.target.value)
                           }
+                          onBlur={saveFieldsOnBlur}
                           className="h-10 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl"
                         />
                       )}
@@ -623,6 +654,7 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
                           onChange={(e) =>
                             updateRepeaterItem(field.name, index, subField.name, e.target.value)
                           }
+                          onBlur={saveFieldsOnBlur}
                           className="border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl resize-none"
                           rows={3}
                         />
