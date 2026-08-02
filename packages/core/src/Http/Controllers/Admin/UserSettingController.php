@@ -12,6 +12,7 @@ use TerraSphere\Core\Models\UserSetting;
 final class UserSettingController
 {
     private const PROPERTY_SECTIONS = [
+        'attributes',
         'spacing',
         'horizontal-alignment',
         'vertical-alignment',
@@ -25,7 +26,7 @@ final class UserSettingController
     public function updateEditorPropertyOrder(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'property_section_order' => ['required', 'array', 'max:8'],
+            'property_section_order' => ['required', 'array', 'max:9'],
             'property_section_order.*' => [
                 'required',
                 'string',

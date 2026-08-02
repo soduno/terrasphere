@@ -99,6 +99,7 @@ export function DraggableElement({
       )}
 
       <div
+        data-editor-component-content
         className={`${isEditing ? 'relative z-30' : ''} flex flex-col`}
         style={{
           justifyContent: getVerticalAlignment(

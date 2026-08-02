@@ -97,6 +97,10 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
                 ->name('pages.field-values.update');
             Route::patch('/pages/{page}/title', [PageController::class, 'updateTitle'])
                 ->name('pages.title.update');
+            Route::get('/pages/{page}/seo', [PageController::class, 'editSeo'])
+                ->name('pages.seo.edit');
+            Route::patch('/pages/{page}/seo', [PageController::class, 'updateSeo'])
+                ->name('pages.seo.update');
             Route::patch('/pages/{page}/publish', [PageController::class, 'publish'])
                 ->name('pages.publish');
         });

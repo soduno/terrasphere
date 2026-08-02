@@ -10,6 +10,7 @@ import {
   LoaderCircle,
   Globe,
   FileText,
+  Search,
 } from 'lucide-react';
 import { Button } from '@ui/button';
 import {
@@ -64,6 +65,10 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
 
   const handleEditFields = (page: PageSummary) => {
     router.visit(`/admin/fields-builder/${page.id}`);
+  };
+
+  const handleEditSeo = (page: PageSummary) => {
+    router.visit(`/admin/pages/${page.id}/seo`);
   };
 
   const handlePublish = (page: PageSummary) => {
@@ -226,6 +231,10 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
                 Edit Fields
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onClick={() => handleEditSeo(page)} className="dark:hover:bg-gray-700">
+              <Search className="w-4 h-4 mr-2" />
+              SEO
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handlePublish(page)} className="dark:hover:bg-gray-700">
               {page.status === 'published'
                 ? <><FileText className="w-4 h-4 mr-2" />Unpublish</>

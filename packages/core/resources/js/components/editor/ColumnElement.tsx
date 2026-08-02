@@ -211,6 +211,7 @@ export function ColumnElement({
       )}
 
       <div
+        data-editor-component-content
         className={`${editing.isEditing ? 'relative z-20' : ''} flex flex-col rounded-lg`}
         style={{
           justifyContent: getVerticalAlignment(

@@ -39,6 +39,7 @@ export interface EditorGridColumnProperties {
 }
 
 export const PROPERTY_SECTION_IDS = [
+  'attributes',
   'spacing',
   'horizontal-alignment',
   'vertical-alignment',
@@ -52,6 +53,8 @@ export const PROPERTY_SECTION_IDS = [
 export type PropertySectionId = typeof PROPERTY_SECTION_IDS[number];
 
 export interface EditorElementProperties {
+  cssClass?: string;
+  htmlId?: string;
   padding?: string;
   paddingTop?: string;
   paddingRight?: string;

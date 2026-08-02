@@ -194,6 +194,39 @@ export default function MediaEdit({ image, formats }: MediaEditProps) {
     }
 
     setIsCropActive(true);
+    if (event.altKey) {
+      const minimumHalfWidth = Math.min(minimumCropSize / 2, sourceWidth / 2);
+      const minimumHalfHeight = Math.min(minimumCropSize / 2, sourceHeight / 2);
+      const centerX = clamp(
+        drag.startX,
+        minimumHalfWidth,
+        sourceWidth - minimumHalfWidth,
+      );
+      const centerY = clamp(
+        drag.startY,
+        minimumHalfHeight,
+        sourceHeight - minimumHalfHeight,
+      );
+      const halfWidth = Math.min(
+        Math.max(minimumHalfWidth, Math.abs(point.x - drag.startX)),
+        centerX,
+        sourceWidth - centerX,
+      );
+      const halfHeight = Math.min(
+        Math.max(minimumHalfHeight, Math.abs(point.y - drag.startY)),
+        centerY,
+        sourceHeight - centerY,
+      );
+
+      setCropArea({
+        x: Math.round(centerX - halfWidth),
+        y: Math.round(centerY - halfHeight),
+        width: Math.round(halfWidth * 2),
+        height: Math.round(halfHeight * 2),
+      });
+      return;
+    }
+
     let x = Math.min(drag.startX, point.x);
     let y = Math.min(drag.startY, point.y);
     const width = Math.max(minimumCropSize, Math.round(Math.abs(point.x - drag.startX)));

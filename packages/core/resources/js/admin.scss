@@ -332,6 +332,11 @@ button:not(:disabled),
 button:disabled,
 [role="button"][aria-disabled="true"] { cursor: not-allowed; }
 
+.dark :is(button, [role="button"], [data-slot="button"]):not([data-editor-component-content] *),
+.dark :is(button, [role="button"], [data-slot="button"]):not([data-editor-component-content] *) * {
+  color: #fff !important;
+}
+
 .admin-shell { display: grid; min-height: 100vh; grid-template-columns: 15rem 1fr; }
 .admin-sidebar { display: flex; flex-direction: column; padding: 1.5rem; background: #102019; color: #dce9df; }
 .admin-brand { display: flex; align-items: center; gap: .75rem; margin-bottom: 2.5rem; font-size: 1.05rem; font-weight: 700; }

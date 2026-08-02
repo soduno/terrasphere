@@ -25,6 +25,7 @@ export function ColumnElementContent({
   const editableClassName = [
     'outline-none transition-all',
     isEditing ? 'ring-2 ring-indigo-500 rounded-lg' : 'cursor-text',
+    element.properties.cssClass,
   ].filter(Boolean).join(' ');
 
   if (
@@ -34,6 +35,7 @@ export function ColumnElementContent({
   ) {
     return (
       <div
+        id={element.properties.htmlId || undefined}
         ref={editableRef}
         contentEditable={isEditing}
         suppressContentEditableWarning
@@ -53,6 +55,8 @@ export function ColumnElementContent({
 
     return (
       <div
+        id={element.properties.htmlId || undefined}
+        className={element.properties.cssClass || undefined}
         style={{
           ...style,
           display: 'flex',
@@ -92,6 +96,8 @@ export function ColumnElementContent({
   if (element.type === 'calendar') {
     return (
       <div
+        id={element.properties.htmlId || undefined}
+        className={element.properties.cssClass || undefined}
         style={{
           ...style,
           display: 'flex',

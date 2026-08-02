@@ -20,6 +20,8 @@ export function ContainerElementContent({
 
   return (
     <div
+      id={element.properties.htmlId || undefined}
+      className={element.properties.cssClass || undefined}
       data-editor-container-id={element.id}
       style={{
         ...getEditorElementStyle(element),

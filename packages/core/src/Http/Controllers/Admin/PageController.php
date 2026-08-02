@@ -232,6 +232,72 @@ final class PageController
         return redirect()->back()->with('success', 'Page title updated.');
     }
 
+    public function updateSeo(Request $request, Page $page): JsonResponse
+    {
+        $validated = $request->validate([
+            'meta_title' => ['nullable', 'string', 'max:255'],
+            'meta_description' => ['nullable', 'string', 'max:1000'],
+            'focus_keyphrase' => ['nullable', 'string', 'max:255'],
+            'canonical_url' => ['nullable', 'url:http,https', 'max:2048'],
+            'robots_index' => ['nullable', 'boolean'],
+            'robots_follow' => ['nullable', 'boolean'],
+            'robots_noarchive' => ['required', 'boolean'],
+            'robots_nosnippet' => ['required', 'boolean'],
+            'robots_noimageindex' => ['required', 'boolean'],
+            'social_title' => ['nullable', 'string', 'max:255'],
+            'social_description' => ['nullable', 'string', 'max:1000'],
+            'social_image' => ['nullable', 'url:http,https', 'max:2048'],
+            'schema_type' => [
+                'nullable',
+                Rule::in([
+                    'WebPage',
+                    'AboutPage',
+                    'ContactPage',
+                    'CollectionPage',
+                    'ItemPage',
+                    'FAQPage',
+                    'ProfilePage',
+                ]),
+            ],
+        ]);
+
+        $page->update($validated);
+
+        return response()->json($this->seoData($page));
+    }
+
+    public function editSeo(Page $page): Response
+    {
+        return Inertia::render('Admin/PageSeo', [
+            'page' => array_merge([
+                'id' => $page->id,
+                'title' => $page->title,
+            ], $this->seoData($page)),
+        ]);
+    }
+
+    /**
+     * @return array<string, bool|string|null>
+     */
+    private function seoData(Page $page): array
+    {
+        return [
+            'metaTitle' => $page->meta_title,
+            'metaDescription' => $page->meta_description,
+            'focusKeyphrase' => $page->focus_keyphrase,
+            'canonicalUrl' => $page->canonical_url,
+            'robotsIndex' => $page->robots_index,
+            'robotsFollow' => $page->robots_follow,
+            'robotsNoarchive' => $page->robots_noarchive,
+            'robotsNosnippet' => $page->robots_nosnippet,
+            'robotsNoimageindex' => $page->robots_noimageindex,
+            'socialTitle' => $page->social_title,
+            'socialDescription' => $page->social_description,
+            'socialImage' => $page->social_image,
+            'schemaType' => $page->schema_type,
+        ];
+    }
+
     public function destroy(Page $page): RedirectResponse
     {
         $page->delete();

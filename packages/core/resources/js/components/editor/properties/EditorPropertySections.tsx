@@ -16,6 +16,7 @@ import type {
   EditorPropertySectionsProps,
 } from '../../../types/editor';
 import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Separator } from '../../ui/separator';
 import {
@@ -204,6 +205,50 @@ export function EditorPropertySections({
           </p>
         </div>
       </div>
+
+      <PropertySection
+        title="HTML attributes"
+        {...sortableSectionProps('attributes')}
+      >
+        <div className="space-y-4">
+          <div>
+            <Label
+              htmlFor={`element-${element.id}-css-class`}
+              className="mb-2 block text-xs text-gray-700 dark:text-gray-300"
+            >
+              CSS class
+            </Label>
+            <Input
+              id={`element-${element.id}-css-class`}
+              type="text"
+              value={properties.cssClass ?? ''}
+              placeholder="e.g. hero-section"
+              onChange={(event) =>
+                onPropertyChange('cssClass', event.target.value)
+              }
+              className="h-10 rounded-lg border-gray-200 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div>
+            <Label
+              htmlFor={`element-${element.id}-html-id`}
+              className="mb-2 block text-xs text-gray-700 dark:text-gray-300"
+            >
+              ID
+            </Label>
+            <Input
+              id={`element-${element.id}-html-id`}
+              type="text"
+              value={properties.htmlId ?? ''}
+              placeholder="e.g. introduction"
+              onChange={(event) =>
+                onPropertyChange('htmlId', event.target.value)
+              }
+              className="h-10 rounded-lg border-gray-200 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+        </div>
+      </PropertySection>
 
       <PropertySection
         title="Spacing"
