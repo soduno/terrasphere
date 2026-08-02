@@ -5,6 +5,7 @@ import type { UseEditablePageTitleOptions } from '../../types/editor';
 export function useEditablePageTitle({
   pageId,
   initialTitle,
+  locale,
 }: UseEditablePageTitleOptions) {
   const [title, setTitleState] = useState(initialTitle);
   const [savedTitle, setSavedTitle] = useState(initialTitle);
@@ -51,7 +52,7 @@ export function useEditablePageTitle({
     setIsSaving(true);
     api.patch(
       `/admin/pages/${pageId}/title`,
-      { title: nextTitle },
+      { title: nextTitle, locale },
       {
         inertia: true,
         preserveScroll: true,

@@ -9,6 +9,9 @@ interface PageModule {
 
 const corePages = import.meta.glob<PageModule>('./Pages/**/*.tsx')
 const mediaPages = import.meta.glob<PageModule>('../../../media/resources/js/Pages/**/*.tsx')
+const localizationPages = import.meta.glob<PageModule>(
+    '../../../localization/resources/js/Pages/**/*.tsx',
+)
 
 createInertiaApp({
     resolve: (name) => {
@@ -16,6 +19,10 @@ createInertiaApp({
             ? mediaPages[
                 `../../../media/resources/js/Pages/${name.slice('Media/'.length)}.tsx`
             ]
+            : name.startsWith('Localization/')
+                ? localizationPages[
+                    `../../../localization/resources/js/Pages/${name.slice('Localization/'.length)}.tsx`
+                ]
             : corePages[`./Pages/${name}.tsx`]
 
         if (!resolver) {

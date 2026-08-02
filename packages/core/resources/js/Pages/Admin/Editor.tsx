@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { router } from '@inertiajs/react';
 import { EditorSidebar } from '@components/editor/EditorSidebar';
 import { EditorCanvas } from '@components/editor/EditorCanvas';
 import { EditorToolbar } from '@components/editor/EditorToolbar';
@@ -13,6 +14,8 @@ import { useEditorAutosave } from '../../composables/editor/useEditorAutosave';
 import { useEditorElements } from '../../composables/editor/useEditorElements';
 import { useEditorImageUpload } from '../../composables/editor/useEditorImageUpload';
 import { useEditorPropertyOrder } from '../../composables/editor/useEditorPropertyOrder';
+import type { Language } from '@localization/types';
+import { DuplicateWysiwygDialog } from '@localization/components/DuplicateWysiwygDialog';
 
 interface EditorProps {
   page: {
@@ -24,10 +27,28 @@ interface EditorProps {
     updatedAt: string | null;
   };
   propertySectionOrder: string[];
+  languages: Language[];
+  locale: string;
+  hasTranslation: boolean;
+  translationSources: Language[];
 }
 
-export default function Editor({ page, propertySectionOrder }: EditorProps) {
+export default function Editor({
+  page,
+  propertySectionOrder,
+  languages,
+  locale,
+  hasTranslation,
+  translationSources,
+}: EditorProps) {
   const [showGridModal, setShowGridModal] = useState(false);
+  const targetLanguage = languages.find((language) => language.locale === locale);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(() =>
+    !hasTranslation
+      && targetLanguage !== undefined
+      && !targetLanguage.isDefault
+      && translationSources.length > 0,
+  );
   const propertyOrder = useEditorPropertyOrder(
     normalizePropertySectionOrder(propertySectionOrder)
   );
@@ -37,6 +58,7 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
     elements: editor.elements,
     initialElements: page.elements,
     initialLockVersion: page.lockVersion,
+    locale,
   });
   const {
     isUploading: isUploadingImages,
@@ -127,6 +149,8 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
           title={page.title}
           status={page.status}
           saveStatus={saveStatus}
+          languages={languages}
+          locale={locale}
         />
         <div className="flex-1 flex overflow-hidden">
           <EditorSidebar
@@ -189,6 +213,19 @@ export default function Editor({ page, propertySectionOrder }: EditorProps) {
             </button>
           </div>
           </div>
+        )}
+        {targetLanguage && (
+          <DuplicateWysiwygDialog
+            pageId={page.id}
+            targetLanguage={targetLanguage}
+            sources={translationSources}
+            open={showDuplicateDialog}
+            onOpenChange={setShowDuplicateDialog}
+            onDuplicated={() => router.visit(
+              `/admin/editor/${page.id}?locale=${encodeURIComponent(locale)}`,
+              { preserveState: false, replace: true },
+            )}
+          />
         )}
       </GridColumnSelectionProvider>
     </TerraGravityProvider>

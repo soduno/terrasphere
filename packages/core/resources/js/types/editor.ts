@@ -463,6 +463,8 @@ export interface EditorToolbarProps {
   title: string;
   status: string;
   saveStatus: EditorSaveStatus;
+  locale?: string;
+  languages?: import('@localization/types').Language[];
 }
 
 export type EditorSaveStatus = 'saved' | 'saving' | 'error';
@@ -472,6 +474,7 @@ export interface UseEditorAutosaveOptions {
   elements: EditorElement[];
   initialElements: EditorElement[];
   initialLockVersion: number;
+  locale: string;
   delay?: number;
 }
 
@@ -486,6 +489,7 @@ export interface MediaUploadResponse {
 export interface UseEditablePageTitleOptions {
   pageId?: number;
   initialTitle: string;
+  locale: string;
 }
 
 export interface UseInlineElementEditingOptions {

@@ -23,6 +23,8 @@ final class Page extends Model
         'social_title',
         'social_description',
         'social_image',
+        'twitter_title',
+        'twitter_description',
         'schema_type',
         'content_type',
         'status',

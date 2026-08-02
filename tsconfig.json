@@ -13,7 +13,9 @@
             "@ui": ["./packages/core/resources/js/components/ui"],
             "@ui/*": ["./packages/core/resources/js/components/ui/*"],
             "@media": ["./packages/media/resources/js"],
-            "@media/*": ["./packages/media/resources/js/*"]
+            "@media/*": ["./packages/media/resources/js/*"],
+            "@localization": ["./packages/localization/resources/js"],
+            "@localization/*": ["./packages/localization/resources/js/*"]
         },
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
@@ -32,6 +34,8 @@
         "packages/core/resources/js/**/*.tsx",
         "packages/media/resources/js/**/*.ts",
         "packages/media/resources/js/**/*.tsx",
+        "packages/localization/resources/js/**/*.ts",
+        "packages/localization/resources/js/**/*.tsx",
         "vite.config.ts"
     ]
 }

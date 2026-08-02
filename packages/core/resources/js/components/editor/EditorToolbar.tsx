@@ -6,16 +6,20 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Separator } from '../ui/separator';
 import type { EditorToolbarProps } from '../../types/editor';
+import { LanguageSelector } from '@localization/components/LanguageSelector';
 
 export function EditorToolbar({
   pageId,
   title,
   status,
   saveStatus,
+  languages = [],
+  locale = 'en',
 }: EditorToolbarProps) {
   const pageTitle = useEditablePageTitle({
     pageId,
     initialTitle: title,
+    locale,
   });
 
   const isPublished = status === 'published';
@@ -94,6 +98,15 @@ export function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-3">
+        <LanguageSelector
+          languages={languages}
+          locale={locale}
+          onSelect={(language) => {
+            if (pageId !== undefined && language.locale !== locale) {
+              router.visit(`/admin/editor/${pageId}?locale=${encodeURIComponent(language.locale)}`);
+            }
+          }}
+        />
         <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
           <Button variant="ghost" size="sm" className="h-9 px-4 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm">
             <Monitor className="w-4 h-4" />

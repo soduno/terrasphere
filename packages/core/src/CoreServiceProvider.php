@@ -7,6 +7,8 @@ namespace TerraSphere\Core;
 use Illuminate\Support\ServiceProvider;
 use TerraSphere\Core\Admin\AdminNavigation;
 use TerraSphere\Core\Console\CreateAdminUserCommand;
+use TerraSphere\Core\Localization\LocalizationManager;
+use TerraSphere\Core\Localization\NullLocalizationManager;
 use TerraSphere\Core\Models\User;
 
 final class CoreServiceProvider extends ServiceProvider
@@ -16,6 +18,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/auth.php', 'auth');
         $this->app['config']->set('auth.providers.users.model', User::class);
         $this->app->singleton(AdminNavigation::class);
+        $this->app->singleton(LocalizationManager::class, NullLocalizationManager::class);
     }
 
     public function boot(): void

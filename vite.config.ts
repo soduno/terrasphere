@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => {
                 '@media': fileURLToPath(
                     new URL('./packages/media/resources/js', import.meta.url),
                 ),
+                '@localization': fileURLToPath(
+                    new URL('./packages/localization/resources/js', import.meta.url),
+                ),
             },
         },
         plugins: [
@@ -33,6 +36,8 @@ export default defineConfig(({ mode }) => {
                     'packages/core/resources/views/**',
                     'packages/core/routes/**',
                     'packages/core/src/**',
+                    'packages/localization/routes/**',
+                    'packages/localization/src/**',
                 ],
             }),
             react(),

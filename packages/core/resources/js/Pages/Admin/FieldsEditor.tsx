@@ -27,6 +27,8 @@ import { Textarea } from '@ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@ui/card';
 import { ImageWithFallback } from '@components/figma/ImageWithFallback';
 import { MediaPickerDialog } from '@media/components/MediaPickerDialog';
+import { LanguageSelector } from '@localization/components/LanguageSelector';
+import type { Language } from '@localization/types';
 
 interface CustomField {
   id: string;
@@ -34,6 +36,7 @@ interface CustomField {
   label: string;
   type: 'text' | 'textarea' | 'image' | 'image-gallery' | 'radio' | 'checkbox' | 'repeater';
   required: boolean;
+  translatable?: boolean;
   options?: string[];
   repeaterFields?: Omit<CustomField, 'repeaterFields'>[];
   columnSpan?: '1' | '2';
@@ -61,7 +64,11 @@ interface FieldsEditorProps {
     title: string;
     rows: FieldRow[];
     values: Record<string, any>;
+    valuesByLocale: Record<string, Record<string, any>>;
+    titlesByLocale: Record<string, string>;
   };
+  languages: Language[];
+  locale: string;
 }
 
 interface MediaPickerTarget {
@@ -69,10 +76,20 @@ interface MediaPickerTarget {
   index?: number;
 }
 
-export default function FieldsEditor({ page }: FieldsEditorProps) {
+export default function FieldsEditor({ page, languages, locale }: FieldsEditorProps) {
+  const defaultLocale = languages.find((language) => language.isDefault)?.locale ?? locale;
   const [fieldValues, setFieldValues] = useState<Record<string, any>>(page.values);
-  const [pageTitle, setPageTitle] = useState(page.title);
-  const [savedPageTitle, setSavedPageTitle] = useState(page.title);
+  const [valuesByLocale, setValuesByLocale] = useState(page.valuesByLocale);
+  const [fieldLocales, setFieldLocales] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      page.rows.flatMap((row) => row.fields.map((field) => [
+        field.name,
+        field.translatable ? locale : defaultLocale,
+      ])),
+    ),
+  );
+  const [pageTitle, setPageTitle] = useState(page.titlesByLocale[locale] || page.title);
+  const [savedPageTitle, setSavedPageTitle] = useState(page.titlesByLocale[locale] || page.title);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -80,32 +97,75 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
   const [draggedMediaField, setDraggedMediaField] = useState<string | null>(null);
   const [uploadingMediaField, setUploadingMediaField] = useState<string | null>(null);
   const [mediaUploadErrors, setMediaUploadErrors] = useState<Record<string, string>>({});
-  const latestFieldValuesRef = useRef(fieldValues);
+  const latestValuesByLocaleRef = useRef(valuesByLocale);
+  const dirtyLocaleVersionsRef = useRef<Record<string, number>>({});
   const fieldSaveInFlightRef = useRef(false);
   const fieldSavePendingRef = useRef(false);
 
-  latestFieldValuesRef.current = fieldValues;
+  latestValuesByLocaleRef.current = valuesByLocale;
+
+  const valueLocale = (fieldName: string) => fieldLocales[fieldName] ?? locale;
+
+  const emptyFieldValue = (field: CustomField) => {
+    if (['image-gallery', 'checkbox', 'repeater'].includes(field.type)) return [];
+    return '';
+  };
+
+  const switchFieldLanguage = (field: CustomField, language: Language) => {
+    setFieldLocales((current) => ({ ...current, [field.name]: language.locale }));
+    setFieldValues((current) => ({
+      ...current,
+      [field.name]: valuesByLocale[language.locale]?.[field.name]
+        ?? emptyFieldValue(field),
+    }));
+  };
+
+  const updateLocalizedField = (
+    fieldName: string,
+    update: (current: any) => any,
+  ) => {
+    const targetLocale = valueLocale(fieldName);
+    dirtyLocaleVersionsRef.current[targetLocale] =
+      (dirtyLocaleVersionsRef.current[targetLocale] ?? 0) + 1;
+    setFieldValues((current) => ({
+      ...current,
+      [fieldName]: update(current[fieldName]),
+    }));
+    setValuesByLocale((current) => {
+      const localeValues = current[targetLocale] ?? {};
+      const next = {
+        ...current,
+        [targetLocale]: {
+          ...localeValues,
+          [fieldName]: update(localeValues[fieldName]),
+        },
+      };
+      latestValuesByLocaleRef.current = next;
+      return next;
+    });
+  };
 
   const handleFieldChange = (fieldName: string, value: any) => {
-    setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
+    updateLocalizedField(fieldName, () => value);
   };
 
   const handleArrayFieldChange = (fieldName: string, index: number, value: string) => {
-    const currentValues = fieldValues[fieldName] || [];
-    const newValues = [...currentValues];
-    newValues[index] = value;
-    setFieldValues((prev) => ({ ...prev, [fieldName]: newValues }));
+    updateLocalizedField(fieldName, (current) => {
+      const next = [...(current || [])];
+      next[index] = value;
+      return next;
+    });
   };
 
   const removeArrayItem = (fieldName: string, index: number) => {
-    const currentValues = fieldValues[fieldName] || [];
-    const newValues = currentValues.filter((_: any, i: number) => i !== index);
-    setFieldValues((prev) => ({ ...prev, [fieldName]: newValues }));
+    updateLocalizedField(
+      fieldName,
+      (current) => (current || []).filter((_: any, i: number) => i !== index),
+    );
   };
 
   const addRepeaterItem = (fieldName: string) => {
-    const currentValues = fieldValues[fieldName] || [];
-    setFieldValues((prev) => ({ ...prev, [fieldName]: [...currentValues, {}] }));
+    updateLocalizedField(fieldName, (current) => [...(current || []), {}]);
   };
 
   const updateRepeaterItem = (
@@ -114,36 +174,53 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
     subFieldName: string,
     value: any
   ) => {
-    const currentValues = fieldValues[fieldName] || [];
-    const newValues = [...currentValues];
-    newValues[index] = { ...newValues[index], [subFieldName]: value };
-    setFieldValues((prev) => ({ ...prev, [fieldName]: newValues }));
+    updateLocalizedField(fieldName, (current) => {
+      const next = [...(current || [])];
+      next[index] = { ...next[index], [subFieldName]: value };
+      return next;
+    });
   };
 
   const removeRepeaterItem = (fieldName: string, index: number) => {
-    const currentValues = fieldValues[fieldName] || [];
-    const newValues = currentValues.filter((_: any, i: number) => i !== index);
-    setFieldValues((prev) => ({ ...prev, [fieldName]: newValues }));
+    updateLocalizedField(
+      fieldName,
+      (current) => (current || []).filter((_: any, i: number) => i !== index),
+    );
   };
 
   const handleCheckboxChange = (fieldName: string, option: string, checked: boolean) => {
-    const currentValues = fieldValues[fieldName] || [];
-    if (checked) {
-      setFieldValues((prev) => ({ ...prev, [fieldName]: [...currentValues, option] }));
-    } else {
-      setFieldValues((prev) => ({
-        ...prev,
-        [fieldName]: currentValues.filter((v: string) => v !== option),
-      }));
+    updateLocalizedField(fieldName, (current) => checked
+      ? [...(current || []), option]
+      : (current || []).filter((value: string) => value !== option));
+  };
+
+  const saveAllFields = async (returnToContent = false) => {
+    const dirtyLanguages = languages.filter(
+      (language) => dirtyLocaleVersionsRef.current[language.locale] !== undefined,
+    );
+
+    for (const language of dirtyLanguages) {
+      const version = dirtyLocaleVersionsRef.current[language.locale];
+      await api.put(
+        `/admin/pages/${page.id}/field-values`,
+        {
+          values: latestValuesByLocaleRef.current[language.locale] ?? {},
+          locale: language.locale,
+        },
+      );
+
+      if (dirtyLocaleVersionsRef.current[language.locale] === version) {
+        delete dirtyLocaleVersionsRef.current[language.locale];
+      }
     }
+
+    if (returnToContent) router.visit('/admin/content');
   };
 
   const handleSave = () => {
-    api.put(
-      `/admin/pages/${page.id}/field-values`,
-      { values: fieldValues },
-      { inertia: true },
-    );
+    void saveAllFields(true).catch(() => {
+      toast.error('The field values could not be saved.');
+    });
   };
 
   const saveFieldsOnBlur = () => {
@@ -154,9 +231,7 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
 
     fieldSaveInFlightRef.current = true;
 
-    api.put(`/admin/pages/${page.id}/field-values`, {
-      values: latestFieldValuesRef.current,
-    }).catch(() => {
+    saveAllFields().catch(() => {
       toast.error('The field values could not be saved.');
     }).finally(() => {
       fieldSaveInFlightRef.current = false;
@@ -170,6 +245,20 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
 
   const handleEditFields = () => {
     router.visit(`/admin/fields-builder/${page.id}`);
+  };
+
+  const switchEditorLanguage = async (language: Language) => {
+    if (language.locale === locale) return;
+
+    try {
+      await saveAllFields();
+      router.visit(
+        `/admin/fields-editor/${page.id}?locale=${encodeURIComponent(language.locale)}`,
+        { preserveState: false },
+      );
+    } catch {
+      toast.error('The field values could not be saved before switching languages.');
+    }
   };
 
   const savePageTitle = () => {
@@ -193,7 +282,7 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
     setIsSavingTitle(true);
     api.patch(
       `/admin/pages/${page.id}/title`,
-      { title },
+      { title, locale },
       {
         inertia: true,
         preserveScroll: true,
@@ -253,12 +342,9 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
       );
 
       const uploadedUrls = payload.images.map((image) => image.url);
-      setFieldValues((current) => ({
-        ...current,
-        [fieldName]: multiple
-          ? [...(current[fieldName] || []), ...uploadedUrls]
-          : uploadedUrls[0],
-      }));
+      updateLocalizedField(fieldName, (current) => multiple
+        ? [...(current || []), ...uploadedUrls]
+        : uploadedUrls[0]);
     } catch (reason) {
       const validationError = reason instanceof ApiError
         ? Object.values(reason.errors).flat()[0]
@@ -750,6 +836,11 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <LanguageSelector
+              languages={languages}
+              locale={locale}
+              onSelect={(language) => void switchEditorLanguage(language)}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -795,11 +886,21 @@ export default function FieldsEditor({ page }: FieldsEditorProps) {
                           </span>
                           <Label
                             htmlFor={field.name}
-                            className="text-sm font-medium text-gray-800 dark:text-gray-100"
+                            className="min-w-0 flex-1 text-sm font-medium text-gray-800 dark:text-gray-100"
                           >
                             {field.label}
                             {field.required && <span className="ml-1 text-red-500">*</span>}
                           </Label>
+                          {field.translatable && languages.length > 0 && (
+                            <div onClick={(event) => event.stopPropagation()}>
+                              <LanguageSelector
+                                compact
+                                languages={languages}
+                                locale={valueLocale(field.name)}
+                                onSelect={(language) => switchFieldLanguage(field, language)}
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1 p-4">
                           {renderField(field)}

@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from '@ui/select';
 import { Textarea } from '@ui/textarea';
+import { LanguageSelector } from '@localization/components/LanguageSelector';
+import type { Language } from '@localization/types';
 
 type RobotsChoice = 'default' | 'allow' | 'disallow';
 
@@ -32,6 +34,8 @@ interface SeoData {
   socialTitle: string | null;
   socialDescription: string | null;
   socialImage: string | null;
+  twitterTitle: string | null;
+  twitterDescription: string | null;
   schemaType: string | null;
 }
 
@@ -40,6 +44,8 @@ interface PageSeoProps {
     id: number;
     title: string;
   };
+  languages: Language[];
+  locale: string;
 }
 
 const schemaTypes = [
@@ -62,7 +68,7 @@ function fromRobotsChoice(value: RobotsChoice): boolean | null {
   return value === 'allow';
 }
 
-export default function PageSeo({ page }: PageSeoProps) {
+export default function PageSeo({ page, languages, locale }: PageSeoProps) {
   const [metaTitle, setMetaTitle] = useState(page.metaTitle ?? '');
   const [metaDescription, setMetaDescription] = useState(page.metaDescription ?? '');
   const [focusKeyphrase, setFocusKeyphrase] = useState(page.focusKeyphrase ?? '');
@@ -75,6 +81,8 @@ export default function PageSeo({ page }: PageSeoProps) {
   const [socialTitle, setSocialTitle] = useState(page.socialTitle ?? '');
   const [socialDescription, setSocialDescription] = useState(page.socialDescription ?? '');
   const [socialImage, setSocialImage] = useState(page.socialImage ?? '');
+  const [twitterTitle, setTwitterTitle] = useState(page.twitterTitle ?? '');
+  const [twitterDescription, setTwitterDescription] = useState(page.twitterDescription ?? '');
   const [schemaType, setSchemaType] = useState(page.schemaType ?? 'WebPage');
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -125,6 +133,8 @@ export default function PageSeo({ page }: PageSeoProps) {
     setSocialTitle(response.socialTitle ?? '');
     setSocialDescription(response.socialDescription ?? '');
     setSocialImage(response.socialImage ?? '');
+    setTwitterTitle(response.twitterTitle ?? '');
+    setTwitterDescription(response.twitterDescription ?? '');
     setSchemaType(response.schemaType ?? 'WebPage');
   };
 
@@ -146,7 +156,10 @@ export default function PageSeo({ page }: PageSeoProps) {
         social_title: socialTitle.trim() || null,
         social_description: socialDescription.trim() || null,
         social_image: socialImage.trim() || null,
+        twitter_title: twitterTitle.trim() || null,
+        twitter_description: twitterDescription.trim() || null,
         schema_type: schemaType,
+        locale,
       });
 
       applyResponse(response);
@@ -194,15 +207,28 @@ export default function PageSeo({ page }: PageSeoProps) {
             </p>
           </div>
         </div>
-        <Button
-          type="button"
-          disabled={saving}
-          onClick={handleSave}
-          className="gap-2 bg-indigo-600 shadow-md shadow-indigo-500/20 hover:bg-indigo-700"
-        >
-          <Save className="size-4" />
-          {saving ? 'Saving...' : 'Save SEO'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <LanguageSelector
+            languages={languages}
+            locale={locale}
+            onSelect={(language) => {
+              if (language.locale !== locale) {
+                router.visit(
+                  `/admin/pages/${page.id}/seo?locale=${encodeURIComponent(language.locale)}`,
+                );
+              }
+            }}
+          />
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            className="gap-2 bg-indigo-600 shadow-md shadow-indigo-500/20 hover:bg-indigo-700"
+          >
+            <Save className="size-4" />
+            {saving ? 'Saving...' : 'Save SEO'}
+          </Button>
+        </div>
       </div>
 
       <div className="grid max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -274,12 +300,12 @@ export default function PageSeo({ page }: PageSeoProps) {
             <CardHeader>
               <CardTitle className="dark:text-white">Social appearance</CardTitle>
               <CardDescription className="dark:text-gray-400">
-                Customize the Open Graph content used when this page is shared.
+                Customize Open Graph and Twitter content used when this page is shared.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="social-title">Social title</Label>
+                <Label htmlFor="social-title">Open Graph title</Label>
                 <Input
                   id="social-title"
                   value={socialTitle}
@@ -291,7 +317,7 @@ export default function PageSeo({ page }: PageSeoProps) {
                 {fieldErrors.social_title && <p className="text-xs text-red-500">{fieldErrors.social_title}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="social-description">Social description</Label>
+                <Label htmlFor="social-description">Open Graph description</Label>
                 <Textarea
                   id="social-description"
                   value={socialDescription}
@@ -302,6 +328,36 @@ export default function PageSeo({ page }: PageSeoProps) {
                   className={`resize-none rounded-xl dark:border-gray-700 dark:bg-gray-800 dark:text-white ${inputErrorClass('social_description')}`}
                 />
                 {fieldErrors.social_description && <p className="text-xs text-red-500">{fieldErrors.social_description}</p>}
+              </div>
+              <div className="border-t border-gray-100 pt-6 dark:border-gray-800">
+                <p className="mb-4 text-sm font-medium text-gray-900 dark:text-white">Twitter overrides</p>
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="twitter-title">Twitter title</Label>
+                    <Input
+                      id="twitter-title"
+                      value={twitterTitle}
+                      maxLength={255}
+                      placeholder="Falls back to the Open Graph title"
+                      onChange={(event) => setTwitterTitle(event.target.value)}
+                      className={`h-11 rounded-xl dark:border-gray-700 dark:bg-gray-800 dark:text-white ${inputErrorClass('twitter_title')}`}
+                    />
+                    {fieldErrors.twitter_title && <p className="text-xs text-red-500">{fieldErrors.twitter_title}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twitter-description">Twitter description</Label>
+                    <Textarea
+                      id="twitter-description"
+                      value={twitterDescription}
+                      maxLength={1000}
+                      rows={4}
+                      placeholder="Falls back to the Open Graph description"
+                      onChange={(event) => setTwitterDescription(event.target.value)}
+                      className={`resize-none rounded-xl dark:border-gray-700 dark:bg-gray-800 dark:text-white ${inputErrorClass('twitter_description')}`}
+                    />
+                    {fieldErrors.twitter_description && <p className="text-xs text-red-500">{fieldErrors.twitter_description}</p>}
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="social-image">Social image URL</Label>

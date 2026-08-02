@@ -13,6 +13,7 @@ export function useEditorAutosave({
   elements,
   initialElements,
   initialLockVersion,
+  locale,
   delay = 800,
 }: UseEditorAutosaveOptions): EditorSaveStatus {
   const [status, setStatus] = useState<EditorSaveStatus>('saved');
@@ -32,6 +33,7 @@ export function useEditorAutosave({
           {
             elements,
             lock_version: lockVersionRef.current,
+            locale,
           },
         );
         lockVersionRef.current = result.lockVersion;
@@ -43,7 +45,7 @@ export function useEditorAutosave({
     }, delay);
 
     return () => window.clearTimeout(timeout);
-  }, [delay, elements, pageId]);
+  }, [delay, elements, locale, pageId]);
 
   return status;
 }

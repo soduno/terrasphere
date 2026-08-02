@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "572e9fa141f9725bdf648c99519bb073",
+    "content-hash": "05003241d8423215daf3f7b2aa0bb8c7",
     "packages": [
         {
             "name": "brick/math",
@@ -5689,6 +5689,41 @@
             }
         },
         {
+            "name": "terrasphere/localization",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/localization",
+                "reference": "0bf5f7a9572929eda12b9a9dbf2cf4c4d66f57ff"
+            },
+            "require": {
+                "inertiajs/inertia-laravel": "^3.0",
+                "php": "^8.5",
+                "terrasphere/core": "dev-main"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "TerraSphere\\Localization\\LocalizationServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "TerraSphere\\Localization\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Language management and shared translation storage for TerraSphere CMS.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "terrasphere/media",
             "version": "dev-main",
             "dist": {
@@ -5942,6 +5977,7 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "terrasphere/core": 20,
+        "terrasphere/localization": 20,
         "terrasphere/media": 20
     },
     "prefer-stable": true,

@@ -1,0 +1,23 @@
+{
+    "name": "terrasphere/localization",
+    "description": "Language management and shared translation storage for TerraSphere CMS.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.5",
+        "inertiajs/inertia-laravel": "^3.0",
+        "terrasphere/core": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "TerraSphere\\Localization\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TerraSphere\\Localization\\LocalizationServiceProvider"
+            ]
+        }
+    }
+}

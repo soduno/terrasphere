@@ -7,6 +7,7 @@
         "php": "^8.5",
         "laravel/framework": "^13.0",
         "terrasphere/core": "dev-main",
+        "terrasphere/localization": "dev-main",
         "terrasphere/media": "dev-main"
     },
     "repositories": [
@@ -27,6 +28,16 @@
                 "symlink": true,
                 "versions": {
                     "terrasphere/media": "dev-main"
+                }
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/localization",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "terrasphere/localization": "dev-main"
                 }
             }
         },

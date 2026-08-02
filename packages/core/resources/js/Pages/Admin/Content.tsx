@@ -23,10 +23,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@ui/alert-dialog';
-import { DropdownMenuItem } from '@ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
 import { DataTable, type DataTableColumn } from '@components/DataTable';
 import { Tabs, TabsList, TabsTrigger } from '@ui/tabs';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@ui/hover-card';
 import { NewPageModal } from './NewPageModal';
+import type { Language } from '@localization/types';
+import { LanguageFlag } from '@localization/components/LanguageFlag';
 
 interface PageSummary {
   id: number;
@@ -34,6 +42,7 @@ interface PageSummary {
   status: 'draft' | 'published' | 'archived';
   type: 'wysiwyg' | 'custom_fields';
   updatedAt: string | null;
+  translatedLocales: string[];
 }
 
 interface FieldSetSummary {
@@ -46,20 +55,29 @@ interface ContentProps {
   pages: PageSummary[];
   fieldSets: FieldSetSummary[];
   filter: string;
+  languages: Language[];
+  defaultLocale: string;
 }
 
-export default function Content({ pages, fieldSets, filter }: ContentProps) {
+export default function Content({ pages, fieldSets, filter, languages, defaultLocale }: ContentProps) {
   const [showNewPageModal, setShowNewPageModal] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(() => new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [singleDeleteTarget, setSingleDeleteTarget] = useState<PageSummary | null>(null);
+  const [translationDeleteTarget, setTranslationDeleteTarget] = useState<{
+    page: PageSummary;
+    language: Language;
+  } | null>(null);
+  const [isDeletingTranslation, setIsDeletingTranslation] = useState(false);
+  const [translationDeleteError, setTranslationDeleteError] = useState<string | null>(null);
 
-  const handleEdit = (page: PageSummary) => {
+  const handleEdit = (page: PageSummary, locale = defaultLocale) => {
+    const query = `?locale=${encodeURIComponent(locale)}`;
     if (page.type === 'wysiwyg') {
-      router.visit(`/admin/editor/${page.id}`);
+      router.visit(`/admin/editor/${page.id}${query}`);
     } else {
-      router.visit(`/admin/fields-editor/${page.id}`);
+      router.visit(`/admin/fields-editor/${page.id}${query}`);
     }
   };
 
@@ -117,12 +135,146 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
     setSingleDeleteTarget(null);
   };
 
+  const confirmTranslationDelete = () => {
+    if (!translationDeleteTarget || isDeletingTranslation) return;
+
+    const { page, language } = translationDeleteTarget;
+    setIsDeletingTranslation(true);
+    setTranslationDeleteError(null);
+
+    api.delete(
+      `/admin/pages/${page.id}/translations/${encodeURIComponent(language.locale)}`,
+      {
+        inertia: true,
+        preserveScroll: true,
+        onSuccess: () => setTranslationDeleteTarget(null),
+        onError: (errors) => {
+          setTranslationDeleteError(
+            Object.values(errors)[0] ?? 'The translation could not be deleted.',
+          );
+        },
+        onFinish: () => setIsDeletingTranslation(false),
+      },
+    );
+  };
+
   const columns: DataTableColumn<PageSummary>[] = [
     {
       key: 'title',
       header: 'Title',
       render: (page) => (
-        <p className="text-sm text-gray-900 dark:text-white">{page.title}</p>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleEdit(page, defaultLocale);
+          }}
+          className="text-left text-sm font-medium text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+        >
+          {page.title}
+        </button>
+      ),
+    },
+    {
+      key: 'language',
+      header: 'Language',
+      render: (page) => (
+        <div className="group/languages flex min-w-28 items-center gap-1.5">
+          {languages
+            .filter((language) => page.translatedLocales.includes(language.locale))
+            .map((language) => (
+              <HoverCard key={language.id} openDelay={180} closeDelay={120}>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleEdit(page, language.locale);
+                    }}
+                    className="rounded-md p-1 text-lg transition hover:bg-gray-100 hover:ring-1 hover:ring-indigo-200 dark:hover:bg-gray-800 dark:hover:ring-indigo-800"
+                    title={`Edit ${page.title} in ${language.name}`}
+                    aria-label={`Edit ${page.title} in ${language.name}`}
+                  >
+                    <LanguageFlag language={language} className="text-lg" />
+                  </button>
+                </HoverCardTrigger>
+                <HoverCardContent
+                  align="start"
+                  className="w-52 rounded-xl p-2"
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-center gap-2 px-2 py-2">
+                    <LanguageFlag language={language} className="text-lg" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{language.name}</p>
+                      <p className="text-xs text-gray-500">Translation available</p>
+                    </div>
+                  </div>
+                  <div className="mt-1 grid gap-1 border-t border-gray-100 pt-1 dark:border-gray-800">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(page, language.locale)}
+                      className="justify-start gap-2"
+                    >
+                      <Edit className="size-4" /> Edit translation
+                    </Button>
+                    {!language.isDefault && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setTranslationDeleteError(null);
+                          setTranslationDeleteTarget({ page, language });
+                        }}
+                        className="justify-start gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
+                      >
+                        <Trash2 className="size-4" /> Delete translation
+                      </Button>
+                    )}
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            ))}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={(event) => event.stopPropagation()}
+                className="flex size-7 items-center justify-center rounded-md text-gray-400 opacity-40 transition hover:bg-indigo-50 hover:text-indigo-600 focus:opacity-100 sm:opacity-0 sm:group-hover/languages:opacity-100 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+                title="Add or edit a translation"
+                aria-label={`Add or edit a translation for ${page.title}`}
+              >
+                <Plus className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-56 rounded-xl">
+              {languages.map((language) => {
+                const translated = page.translatedLocales.includes(language.locale);
+
+                return (
+                  <DropdownMenuItem
+                    key={language.id}
+                    onSelect={() => handleEdit(page, language.locale)}
+                    className="flex items-center gap-3"
+                  >
+                    <LanguageFlag language={language} className="text-lg" />
+                    <span className="flex-1">
+                      <span className="block">{language.name}</span>
+                      <span className="block text-xs text-gray-500">
+                        {translated ? 'Translation available' : 'Create translation'}
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ),
     },
     {
@@ -156,11 +308,6 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
       ),
     },
     {
-      key: 'author',
-      header: 'Author',
-      render: () => <span className="text-sm text-gray-700 dark:text-gray-300">&mdash;</span>,
-    },
-    {
       key: 'date',
       header: 'Date',
       render: (page) => (
@@ -168,11 +315,6 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
           {page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : '\u2014'}
         </span>
       ),
-    },
-    {
-      key: 'views',
-      header: 'Views',
-      render: () => <span className="text-sm text-gray-700 dark:text-gray-300">&mdash;</span>,
     },
   ];
 
@@ -298,6 +440,43 @@ export default function Content({ pages, fieldSets, filter }: ContentProps) {
             >
               {isDeleting && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
               Delete page
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={translationDeleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingTranslation) setTranslationDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete the {translationDeleteTarget?.language.name} translation?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the translated page title, content fields, visual-editor content,
+              and SEO values for &ldquo;{translationDeleteTarget?.page.title}&rdquo;. The default
+              language is not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {translationDeleteError && (
+            <p className="text-sm text-destructive">{translationDeleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingTranslation}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                confirmTranslationDelete();
+              }}
+              disabled={isDeletingTranslation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingTranslation && <LoaderCircle className="mr-2 size-4 animate-spin" />}
+              Delete translation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

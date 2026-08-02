@@ -12,6 +12,7 @@ import {
   Image,
   Images,
   LayoutPanelTop,
+  Languages,
   Plus,
   Repeat2,
   Save,
@@ -45,6 +46,7 @@ interface CustomField {
   label: string;
   type: FieldType;
   required: boolean;
+  translatable: boolean;
   options?: string[];
   repeaterFields?: Omit<CustomField, 'repeaterFields'>[];
   columnSpan?: '1' | '2';
@@ -151,6 +153,7 @@ export default function FieldsBuilder({ page, errors = {}, saveUrl, backUrl }: F
       label: fieldType?.label || 'New field',
       type,
       required: false,
+      translatable: true,
       columnSpan: '1',
       options: type === 'radio' || type === 'checkbox' ? ['Option 1', 'Option 2'] : undefined,
       repeaterFields: type === 'repeater' ? [] : undefined,
@@ -689,6 +692,11 @@ function FieldConfigurator({
                   Required
                 </span>
               )}
+              {field.translatable && (
+                <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                  Localized
+                </span>
+              )}
             </span>
             <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
               Field {fieldIndex + 1} · {fieldType.label} · API: {field.name}
@@ -788,23 +796,20 @@ function FieldConfigurator({
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={field.required}
-              onClick={() => onUpdate(rowId, field.id, { required: !field.required })}
-              className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-gray-300"
-            >
-              <span className={`relative h-5 w-9 rounded-full transition ${
-                field.required ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'
-              }`}>
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                  field.required ? 'left-[18px]' : 'left-0.5'
-                }`} />
-              </span>
-              Required field
-            </button>
+          <div className="mt-4 flex items-center justify-between gap-4 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <div className="flex flex-wrap items-center gap-4">
+              <FieldSwitch
+                checked={field.required}
+                onClick={() => onUpdate(rowId, field.id, { required: !field.required })}
+                label="Required field"
+              />
+              <FieldSwitch
+                checked={field.translatable ?? false}
+                onClick={() => onUpdate(rowId, field.id, { translatable: !field.translatable })}
+                label="Translatable"
+                icon={<Languages className="size-3.5" />}
+              />
+            </div>
 
             <Button
               variant="ghost"
@@ -819,5 +824,37 @@ function FieldConfigurator({
         </div>
       )}
     </article>
+  );
+}
+
+function FieldSwitch({
+  checked,
+  onClick,
+  label,
+  icon,
+}: {
+  checked: boolean;
+  onClick: () => void;
+  label: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onClick}
+      className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-gray-300"
+    >
+      <span className={`relative h-5 w-9 rounded-full transition ${
+        checked ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'
+      }`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+          checked ? 'left-[18px]' : 'left-0.5'
+        }`} />
+      </span>
+      {icon}
+      {label}
+    </button>
   );
 }

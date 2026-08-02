@@ -83,6 +83,14 @@ Route::middleware(['web', HandleAdminInertiaRequests::class])
             Route::get('/editor/{page}', [PageController::class, 'editWysiwyg'])->name('editor');
             Route::put('/pages/{page}/wysiwyg', [PageController::class, 'saveWysiwyg'])
                 ->name('pages.wysiwyg.update');
+            Route::post(
+                '/pages/{page}/wysiwyg/{locale}/duplicate',
+                [PageController::class, 'duplicateWysiwygTranslation'],
+            )->name('pages.wysiwyg.duplicate');
+            Route::delete(
+                '/pages/{page}/translations/{locale}',
+                [PageController::class, 'destroyTranslation'],
+            )->name('pages.translations.destroy');
             Route::put(
                 '/user-settings/editor/property-order',
                 [UserSettingController::class, 'updateEditorPropertyOrder']
